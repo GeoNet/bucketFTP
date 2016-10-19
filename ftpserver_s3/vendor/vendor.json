@@ -1,0 +1,21 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"path": "github.com/fclairamb/ftpserver",
+			"revision": "1e8332a6f6f024a0de47522834c32936960a09f9",
+			"revisionTime": "2016-10-04T07:26:05+02:00"
+		},
+		{
+			"path": "github.com/fclairamb/ftpserver/sample",
+			"revision": "1e8332a6f6f024a0de47522834c32936960a09f9",
+			"revisionTime": "2016-10-04T07:26:05+02:00"
+		},
+		{
+			"path": "github.com/fclairamb/ftpserver/server",
+			"revision": "1e8332a6f6f024a0de47522834c32936960a09f9",
+			"revisionTime": "2016-10-04T07:26:05+02:00"
+		}
+	]
+}
