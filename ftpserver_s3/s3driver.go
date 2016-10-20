@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/fclairamb/ftpserver/server"
-	"io"
 	"log"
 	"os"
-	"time"
 )
 
 // SampleDriver defines a very basic serverftp driver
@@ -107,25 +105,15 @@ func (driver *SampleDriver) UserLeft(cc server.ClientContext) {
 }
 
 func (driver *SampleDriver) OpenFile(cc server.ClientContext, path string, flag int) (server.FileStream, error) {
-	// TODO: this is the guts of the issue.  Implement as a virtual file for now, refactor later (avoid reading into ram)
+	// our implementation uses an interface that mimics a file but uploads/downloads to S3
+	var err error
+	var s3file *S3VirtualFile
 
-	//return &VirtualFile{content: []byte(driver.baseDir)}, nil
+	if s3file, err = NewS3VirtualFile(path); err != nil {
+		return nil, err
+	}
 
-	// TODO: read the content and store in this object
-	return &VirtualFile{content: []byte("just some bytes...")}, nil
-
-	//
-	//path = driver.baseDir + path
-	//
-	//// If we are writing and we are not in append mode, we should remove the file
-	//if (flag & os.O_WRONLY) != 0 {
-	//	flag |= os.O_CREATE
-	//	if (flag & os.O_APPEND) == 0 {
-	//		os.Remove(path)
-	//	}
-	//}
-	//
-	//return os.OpenFile(path, flag, 0666)
+	return s3file, nil
 }
 
 func (driver *SampleDriver) GetFileInfo(cc server.ClientContext, path string) (os.FileInfo, error) {
@@ -183,59 +171,32 @@ func S3Driver() *SampleDriver {
 	return driver
 }
 
-type VirtualFile struct {
-	content    []byte // Content of the file
-	readOffset int    // Reading offset
-}
-
-func (f *VirtualFile) Close() error {
-	return nil
-}
-
-func (f *VirtualFile) Read(buffer []byte) (int, error) {
-	n := copy(buffer, f.content[f.readOffset:])
-	f.readOffset += n
-	if n == 0 {
-		return 0, io.EOF
-	}
-
-	return n, nil
-}
-
-func (f *VirtualFile) Seek(n int64, w int) (int64, error) {
-	return 0, nil
-}
-
-func (f *VirtualFile) Write(buffer []byte) (int, error) {
-	return 0, nil
-}
-
-type VirtualFileInfo struct {
-	name string
-	size int64
-	mode os.FileMode
-}
-
-func (f VirtualFileInfo) Name() string {
-	return f.name
-}
-
-func (f VirtualFileInfo) Size() int64 {
-	return f.size
-}
-
-func (f VirtualFileInfo) Mode() os.FileMode {
-	return f.mode
-}
-
-func (f VirtualFileInfo) IsDir() bool {
-	return f.mode.IsDir()
-}
-
-func (f VirtualFileInfo) ModTime() time.Time {
-	return time.Now().UTC()
-}
-
-func (f VirtualFileInfo) Sys() interface{} {
-	return nil
-}
+//type VirtualFileInfo struct {
+//	name string
+//	size int64
+//	mode os.FileMode
+//}
+//
+//func (f VirtualFileInfo) Name() string {
+//	return f.name
+//}
+//
+//func (f VirtualFileInfo) Size() int64 {
+//	return f.size
+//}
+//
+//func (f VirtualFileInfo) Mode() os.FileMode {
+//	return f.mode
+//}
+//
+//func (f VirtualFileInfo) IsDir() bool {
+//	return f.mode.IsDir()
+//}
+//
+//func (f VirtualFileInfo) ModTime() time.Time {
+//	return time.Now().UTC()
+//}
+//
+//func (f VirtualFileInfo) Sys() interface{} {
+//	return nil
+//}
