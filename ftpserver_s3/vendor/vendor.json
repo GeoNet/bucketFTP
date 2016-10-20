@@ -3,19 +3,181 @@
 	"ignore": "test",
 	"package": [
 		{
-			"path": "github.com/fclairamb/ftpserver",
-			"revision": "1e8332a6f6f024a0de47522834c32936960a09f9",
-			"revisionTime": "2016-10-04T07:26:05+02:00"
+			"path": "github.com/aws/aws-sdk-go/aws",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
 		},
 		{
-			"path": "github.com/fclairamb/ftpserver/sample",
-			"revision": "1e8332a6f6f024a0de47522834c32936960a09f9",
-			"revisionTime": "2016-10-04T07:26:05+02:00"
+			"path": "github.com/aws/aws-sdk-go/aws/awserr",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/awsutil",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/client",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/client/metadata",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/corehandlers",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/credentials",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/credentials/endpointcreds",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/credentials/stscreds",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/defaults",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/ec2metadata",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/request",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/session",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/aws/signer/v4",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/endpoints",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/protocol",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/protocol/query",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/protocol/query/queryutil",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/protocol/rest",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/protocol/restxml",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/private/waiter",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/service/s3",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/service/s3/s3iface",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/service/s3/s3manager",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/aws/aws-sdk-go/service/sts",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
 		},
 		{
 			"path": "github.com/fclairamb/ftpserver/server",
 			"revision": "1e8332a6f6f024a0de47522834c32936960a09f9",
 			"revisionTime": "2016-10-04T07:26:05+02:00"
+		},
+		{
+			"origin": "github.com/aws/aws-sdk-go/vendor/github.com/go-ini/ini",
+			"path": "github.com/go-ini/ini",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/jehiah/go-strftime",
+			"revision": "2efbe75097a505e2789f7e39cb9da067b5be8e3e",
+			"revisionTime": "2015-12-06T14:48:10-05:00"
+		},
+		{
+			"origin": "github.com/aws/aws-sdk-go/vendor/github.com/jmespath/go-jmespath",
+			"path": "github.com/jmespath/go-jmespath",
+			"revision": "5717392a1fc0a2cc1e35b28eef3154ce318b18f4",
+			"revisionTime": "2016-10-05T12:30:57-07:00"
+		},
+		{
+			"path": "github.com/mattn/go-colorable",
+			"revision": "6c903ff4aa50920ca86087a280590b36b3152b9c",
+			"revisionTime": "2016-09-30T17:41:57+09:00"
+		},
+		{
+			"path": "gopkg.in/inconshreveable/log15.v2",
+			"revision": "b105bd37f74e5d9dc7b6ad7806715c7a2b83fd3f",
+			"revisionTime": "2015-09-21T14:38:54-07:00"
+		},
+		{
+			"path": "gopkg.in/inconshreveable/log15.v2/stack",
+			"revision": "b105bd37f74e5d9dc7b6ad7806715c7a2b83fd3f",
+			"revisionTime": "2015-09-21T14:38:54-07:00"
+		},
+		{
+			"path": "gopkg.in/inconshreveable/log15.v2/term",
+			"revision": "b105bd37f74e5d9dc7b6ad7806715c7a2b83fd3f",
+			"revisionTime": "2015-09-21T14:38:54-07:00"
 		}
 	]
 }

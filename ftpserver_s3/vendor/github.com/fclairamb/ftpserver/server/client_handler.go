@@ -9,7 +9,6 @@ import (
 	"strings"
 	"errors"
 	"io"
-	"log"
 )
 
 type clientHandler struct {
@@ -120,7 +119,6 @@ func (c *clientHandler) HandleCommands() {
 		c.param = param
 
 		fn := commandsMap[command]
-		log.Println("DEBUG command is", command)
 		if fn == nil {
 			c.writeMessage(550, "not allowed")
 		} else {
