@@ -131,16 +131,17 @@ func (driver *S3Driver) CanAllocate(cc server.ClientContext, size int) (bool, er
 }
 
 func (driver *S3Driver) ChmodFile(cc server.ClientContext, path string, mode os.FileMode) error {
-	//path = driver.baseDir + path
-	//return os.Chmod(path, mode)
 	return errors.New("ChmodFile not implemented")
 }
 
 func (driver *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
-	//path = driver.baseDir + path
-	//
-	//return os.Remove(path)
-	return errors.New("DeleteFile not implemented")
+	params := &s3.DeleteObjectInput{
+		Bucket: &S3_BUCKET_NAME,
+		Key:    &path,
+	}
+
+	_, err := driver.s3Service.DeleteObject(params)
+	return err
 }
 
 func (driver *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
