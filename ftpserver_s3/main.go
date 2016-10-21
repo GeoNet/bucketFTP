@@ -3,15 +3,15 @@ package main
 import (
 	"flag"
 	"github.com/fclairamb/ftpserver/server"
-	"os/signal"
-	"syscall"
-	"os"
 	"log"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 )
 
 var (
-	ftpServer *server.FtpServer
+	ftpServer      *server.FtpServer
 	FTP_PORT_STR   = os.Getenv("FTP_PORT")
 	FTP_PORT       int
 	S3_BUCKET_NAME = os.Getenv("S3_BUCKET_NAME")
@@ -39,13 +39,18 @@ func init() {
 
 func main() {
 	flag.Parse()
-	//ftpServer = server.NewFtpServer(sample.NewSampleDriver())
-	ftpServer = server.NewFtpServer(S3Driver())
+
+	var err error
+	var driver *S3Driver
+	if driver, err = NewS3Driver(); err != nil {
+		log.Fatal("error creating S3 FTP driver", err)
+	}
+
+	ftpServer = server.NewFtpServer(driver)
 
 	go signalHandler()
 
-	err := ftpServer.ListenAndServe()
-	if err != nil {
+	if err = ftpServer.ListenAndServe(); err != nil {
 		log.Println("Problem listening", err)
 	}
 }
