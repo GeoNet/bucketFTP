@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"io"
+	"os"
+	"time"
 )
 
 type S3VirtualFile struct {
@@ -103,4 +105,45 @@ func (f *S3VirtualFile) Write(buffer []byte) (int, error) {
 	}
 
 	return f.writePipe.Write(buffer)
+}
+
+// needs:
+//Name() string       // base name of the file
+//Size() int64        // length in bytes for regular files; system-dependent for others
+//Mode() FileMode     // file mode bits
+//ModTime() time.Time // modification time
+//IsDir() bool        // abbreviation for Mode().IsDir()
+//Sys() interface{}
+
+type fakeInfo struct {
+	name    string
+	size    int64
+	mode    os.FileMode
+	modTime time.Time
+	isDir   bool
+	sys     interface{}
+}
+
+func (fi fakeInfo) Name() string {
+	return fi.name
+}
+
+func (fi fakeInfo) Size() int64 {
+	return fi.size
+}
+
+func (fi fakeInfo) Mode() os.FileMode {
+	return fi.mode
+}
+
+func (fi fakeInfo) ModTime() time.Time {
+	return fi.modTime
+}
+
+func (fi fakeInfo) IsDir() bool {
+	return fi.isDir
+}
+
+func (fi fakeInfo) Sys() interface{} {
+	return nil
 }

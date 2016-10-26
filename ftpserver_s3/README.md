@@ -28,6 +28,6 @@ be supplied (available from the AWS console).
 * No buffering or saving to tempfiles is done on the FTP server, this 
 should let a user upload or download large files (untested).
 * This is a minimal implementation, only the required commands have been
-implemented: get, put.
+implemented: get, put, delete, ls.
 * It was intended to run this from Docker but this server uses random
 port numbers which are poorly supported by docker.

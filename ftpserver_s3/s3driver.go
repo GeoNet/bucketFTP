@@ -9,6 +9,7 @@ import (
 	"github.com/fclairamb/ftpserver/server"
 	"log"
 	"os"
+	"strings"
 )
 
 // SampleDriver defines a very basic serverftp driver
@@ -41,8 +42,6 @@ func (driver *S3Driver) AuthUser(cc server.ClientContext, user, pass string) (se
 		return nil, err
 	}
 
-	driver.baseDir = "/"
-
 	return driver, nil
 }
 
@@ -69,39 +68,31 @@ func (driver *S3Driver) MakeDirectory(cc server.ClientContext, directory string)
 
 func (driver *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
-	//if cc.Path() == "/virtual" {
-	//	files := make([]os.FileInfo, 0)
-	//	files = append(files,
-	//		VirtualFileInfo{
-	//			name: "localpath.txt",
-	//			mode: os.FileMode(0666),
-	//			size: 1024,
-	//		},
-	//		VirtualFileInfo{
-	//			name: "file2.txt",
-	//			mode: os.FileMode(0666),
-	//			size: 2048,
-	//		},
-	//	)
-	//	return files, nil
-	//}
-	//
-	//path := driver.baseDir + cc.Path()
-	//
-	//files, err := ioutil.ReadDir(path)
-	//
-	//// We add a virtual dir
-	//if cc.Path() == "/" && err == nil {
-	//	files = append(files, VirtualFileInfo{
-	//		name: "virtual",
-	//		mode: os.FileMode(0666) | os.ModeDir,
-	//		size: 4096,
-	//	})
-	//}
-	//
-	//return files, err
-	log.Println("Hello listing some files...")
-	return nil, errors.New("ListFiles not implemented")
+	params := &s3.ListObjectsV2Input{
+		Bucket: &S3_BUCKET_NAME,
+		//Prefix: &driver.baseDir,
+		//Delimiter: keys ending with this string, a bit misleading
+	}
+
+	var err error
+	var resp *s3.ListObjectsV2Output
+	if resp, err = driver.s3Service.ListObjectsV2(params); err != nil {
+		return nil, err
+	}
+
+	files := []os.FileInfo{}
+	for _, f := range resp.Contents {
+		fake := fakeInfo{
+			name:    *f.Key,
+			size:    *f.Size,
+			mode:    os.FileMode(0666),
+			modTime: *f.LastModified,
+			isDir:   strings.HasSuffix(*f.Key, "/"),
+		}
+		files = append(files, fake)
+	}
+
+	return files, nil
 }
 
 func (driver *S3Driver) UserLeft(cc server.ClientContext) {
@@ -121,9 +112,28 @@ func (driver *S3Driver) OpenFile(cc server.ClientContext, path string, flag int)
 }
 
 func (driver *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInfo, error) {
-	//path = driver.baseDir + path
 
-	return nil, errors.New("GetFileInfo not implemented")
+	params := &s3.GetObjectInput{
+		Bucket: &S3_BUCKET_NAME,
+		Key:    &path,
+	}
+
+	req, resp := driver.s3Service.GetObjectRequest(params)
+
+	if err := req.Send(); err != nil {
+		return nil, err
+	}
+
+	f := fakeInfo{
+		name:    path,
+		size:    *resp.ContentLength,
+		mode:    os.FileMode(0666), // No file modes in S3, pretend it's a+rwx.  AWS handles permissions.
+		modTime: *resp.LastModified,
+		isDir:   false, // TODO: get this
+		sys:     nil,   // we don't appear to use this so leave as nil
+	}
+
+	return f, nil
 }
 
 func (driver *S3Driver) CanAllocate(cc server.ClientContext, size int) (bool, error) {
@@ -145,10 +155,20 @@ func (driver *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 }
 
 func (driver *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
-	//from = driver.baseDir + from
-	//to = driver.baseDir + to
+
+	// S3 doesn't have rename (or move) so we need to copy (CopyObject) and delete the old one (DeleteObject).  Put off for now.
+
+	//copySrc := S3_BUCKET_NAME + "/" + from
+	//copyParams := &s3.CopyObjectInput{
+	//	Bucket: &S3_BUCKET_NAME,
+	//	Key: &to,
+	//	CopySource: &copySrc,
+	//}
 	//
-	//return os.Rename(from, to)
+	//if _, err := driver.s3Service.CopyObject(copyParams); err != nil {
+	//	return err
+	//}
+
 	return errors.New("RenameFile not implemented")
 }
 
