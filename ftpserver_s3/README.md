@@ -43,8 +43,9 @@ server running on localhost at port 3000: `ftp -p localhost 3000`
 * No buffering or saving to temp files is done on the FTP server, this 
 should let a user upload or download large files (untested).
 * This is a minimal implementation, only the required commands have been
-implemented: get, put, delete, ls, cd.
+implemented: get, put, delete, ls, cd, rename, mkdir.
 * It was intended to run this from Docker but this server uses random
 port numbers which are difficult to support in Docker.
 * All dependencies are vendored using govendor.  Recent versions of Go
 should automatically use these packages.
+* Globbing (eg: *.jpg) is not supported

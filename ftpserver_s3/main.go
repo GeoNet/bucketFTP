@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"github.com/fclairamb/ftpserver/server"
 	"log"
 	"os"
@@ -38,8 +37,6 @@ func init() {
 }
 
 func main() {
-	flag.Parse()
-
 	var err error
 	var driver *S3Driver
 	if driver, err = NewS3Driver(); err != nil {

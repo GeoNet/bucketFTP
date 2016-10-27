@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"bytes"
 )
 
 // SampleDriver defines a very basic serverftp driver
@@ -88,8 +89,24 @@ func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) er
 }
 
 func (d *S3Driver) MakeDirectory(cc server.ClientContext, directory string) error {
-	//return os.Mkdir(driver.baseDir+directory, 0777)
-	return errors.New("MakeDirectory not implemented")
+
+	dirname := directory
+	if !strings.HasSuffix(dirname, "/") {
+		dirname += "/"
+	}
+
+	params := &s3.PutObjectInput{
+		Bucket:             &S3_BUCKET_NAME,
+		Key:                &dirname,
+		Body:               bytes.NewReader([]byte("")),
+	}
+
+	var err error
+	if _, err = d.s3Service.PutObject(params); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
@@ -154,7 +171,7 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 		size:    *resp.ContentLength,
 		mode:    os.FileMode(0666), // No file modes in S3, pretend it's a+rwx.  AWS handles permissions.
 		modTime: *resp.LastModified,
-		isDir:   false, // TODO: get this
+		isDir:   strings.HasSuffix(path, "/"), // TODO: see if there's a better way to determine if it's a directory
 		sys:     nil,   // we don't appear to use this so leave as nil
 	}
 
@@ -180,21 +197,34 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 }
 
 func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
+	// S3 doesn't have rename (or move) so we need to copy (CopyObject) and delete the old one (DeleteObject).
+	var err error
 
-	// S3 doesn't have rename (or move) so we need to copy (CopyObject) and delete the old one (DeleteObject).  Put off for now.
+	var relFrom, relTo string
+	if relFrom, err = filepath.Rel("/", from); err != nil {
+		return err
+	}
 
-	//copySrc := S3_BUCKET_NAME + "/" + from
-	//copyParams := &s3.CopyObjectInput{
-	//	Bucket: &S3_BUCKET_NAME,
-	//	Key: &to,
-	//	CopySource: &copySrc,
-	//}
-	//
-	//if _, err := driver.s3Service.CopyObject(copyParams); err != nil {
-	//	return err
-	//}
+	if relTo, err = filepath.Rel("/", to); err != nil {
+		return err
+	}
 
-	return errors.New("RenameFile not implemented")
+	copySrc := S3_BUCKET_NAME + "/" + relFrom
+	copyParams := &s3.CopyObjectInput{
+		Bucket: &S3_BUCKET_NAME,
+		Key: &relTo,
+		CopySource: &copySrc,
+	}
+
+	if _, err = d.s3Service.CopyObject(copyParams); err != nil {
+		return err
+	}
+
+	if err = d.DeleteFile(cc, from); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *S3Driver) GetSettings() *server.Settings {
