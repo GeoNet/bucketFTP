@@ -119,8 +119,8 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
 	delimiter := "/" // delimiter keeps the listing from being recursive
 	params := &s3.ListObjectsV2Input{
-		Bucket: &S3_BUCKET_NAME,
-		Prefix: &d.baseDir,
+		Bucket:    &S3_BUCKET_NAME,
+		Prefix:    &d.baseDir,
 		Delimiter: &delimiter,
 	}
 
@@ -136,7 +136,7 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 	for _, dir := range resp.CommonPrefixes {
 		var dirInfo os.FileInfo
 
-		if dirInfo, err =  d.GetFileInfo(cc, filepath.Join("/", *dir.Prefix) + "/"); err != nil {
+		if dirInfo, err = d.GetFileInfo(cc, filepath.Join("/", *dir.Prefix)+"/"); err != nil {
 			return nil, err
 		}
 
@@ -152,7 +152,7 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 		}
 
 		var fi os.FileInfo
-		if fi, err =  d.GetFileInfo(cc, filepath.Join("/", *f.Key)); err != nil {
+		if fi, err = d.fakeFileInfo(*f.Key, *f.Size, *f.LastModified); err != nil {
 			return nil, err
 		}
 		files = append(files, fi)
@@ -212,18 +212,40 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 		modTime = *resp.LastModified
 	}
 
-	displayPath := relPath
+	var f os.FileInfo
+	if f, err = d.fakeFileInfo(relPath, objectSize, modTime); err != nil {
+		return nil, err
+	}
+
+	return f, nil
+}
+
+// Return a fakeInfo struct that satisfies the os.FileInfo interface, emulating a file from an S3 object
+func (d *S3Driver) fakeFileInfo(name string, size int64, modTime time.Time) (os.FileInfo, error) {
+	var err error
+
+	displayPath := name
+	// make the path we display relative to the current working directory
 	if strings.HasPrefix(displayPath, d.baseDir) {
 		if displayPath, err = filepath.Rel(d.baseDir, displayPath); err != nil {
 			return nil, err
 		}
-
-		if strings.HasSuffix(path, "/") {
-			displayPath += "/"
-		}
 	}
 
-	f := fakeFileInfo(displayPath, objectSize, modTime)
+	isDir := strings.HasSuffix(name, "/")
+
+	mode := os.FileMode(0666)
+	if isDir {
+		mode = mode | os.ModeDir
+	}
+
+	f := fakeInfo{
+		name:    displayPath,
+		size:    size,
+		mode:    mode,
+		modTime: modTime,
+		isDir:   isDir,
+	}
 
 	return f, nil
 }
@@ -305,25 +327,4 @@ func NewS3Driver() (*S3Driver, error) {
 	driver.baseDir = ""
 
 	return driver, nil
-}
-
-// Return a fakeInfo struct that satisfies the os.FileInfo interface, emulating a file from an S3 object
-func fakeFileInfo(name string, size int64, modTime time.Time) fakeInfo {
-
-	isDir := strings.HasSuffix(name, "/")
-
-	mode := os.FileMode(0666)
-	if isDir {
-		mode = mode | os.ModeDir
-	}
-
-	f := fakeInfo{
-		name:    name,
-		size:    size,
-		mode:    mode,
-		modTime: modTime,
-		isDir:   isDir,
-	}
-
-	return f
 }
