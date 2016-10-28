@@ -36,6 +36,8 @@ value.  Eg: `export FTP_PORT=3000`.  You will need valid AWS credentials.
 * run the ftpserver: `./ftpserver_s3`
 * use an FTP client to connect to your running server, eg on Linux connect to the ftp
 server running on localhost at port 3000: `ftp -p localhost 3000`
+* You can then use the FTP client to put/get/cd/mkdir/rename/del files and directories
+on S3.
 
 ## Important Notes
 
