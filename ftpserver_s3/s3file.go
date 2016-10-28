@@ -107,14 +107,6 @@ func (f *S3VirtualFile) Write(buffer []byte) (int, error) {
 	return f.writePipe.Write(buffer)
 }
 
-// needs:
-//Name() string       // base name of the file
-//Size() int64        // length in bytes for regular files; system-dependent for others
-//Mode() FileMode     // file mode bits
-//ModTime() time.Time // modification time
-//IsDir() bool        // abbreviation for Mode().IsDir()
-//Sys() interface{}
-
 type fakeInfo struct {
 	name    string
 	size    int64
