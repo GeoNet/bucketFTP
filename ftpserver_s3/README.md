@@ -1,20 +1,21 @@
 # FTP Server for S3
 
 This is a Go implementation of an FTP server which uses Amazon S3 for storage
-of file.  It's easy to build and supports basic FTP commands such as get, put, 
+of files.  It's easy to build and supports basic FTP commands such as get, put, 
 delete, ls, cd, rename, and mkdir.  It is free and open source, using the 
 Apache 2.0 license.
 
 ## Security
 
-FTP is an extremely insecure protocol.  We use hardware that requires 
-an FTP server for transferring files.  We strongly recommend using a 
-private network when using FTP.
+FTP is an insecure protocol.  We use specialised hardware that only supports FTP. 
+We strongly recommend using a private network when using FTP.
 
 User auth is extremely simple.  It's checking against environment variables.
-This will likely change in the future.
+This will likely change in the future.  One option would be to use the S3 
+credentials for the username/password, but we didn't want these accidentally 
+transmitted in plain text.
 
-TLS is not currently implemented but is supported by the ftp server.
+TLS is not currently implemented but is supported by the upstream ftp server.
 
 File modes on S3 are faked.  Attempting to read or modify a file on S3 with
 insufficient permissions will raise an error.
@@ -25,7 +26,7 @@ This utility uses the [ftpserver] (github.com/fclairamb/ftpserver/server) packag
 with a custom driver that uses the [AWS SDK for Go] (github.com/aws/aws-sdk-go/aws).
 
 The environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY should
-be supplied (These are available from the AWS console for S3).
+be set when running the FTP server (These are available from the AWS console for S3).
 
 ## Quickstart
 
@@ -39,6 +40,20 @@ value.  Eg: `export FTP_PORT=3000`.  You will need valid AWS credentials.
 server running on localhost at port 3000: `ftp -p localhost 3000`
 * You can then use the FTP client (eg: command line ftp or FileZilla) to 
 put/get/cd/mkdir/rename/del files and directories on S3.
+
+## Building and running from Docker
+
+* Install and test Docker on your system.
+* build the docker container using the script (on systems supporting bash): `./build.sh`.  This
+builds in the Alpine Go container and creates a new scratch based container containing the FTP 
+server executable and ssl certs required by the AWS SDK.
+* it should report something similar to "Successfully built b5245065b234"
+* run the container with the command `docker run -p21:21 --env-file env.list -it b5245065b234`, 
+using the name of the container you just built as the last argument.  This will run the server
+in a terminal with stderr/stdout being printed to the screen.
+* The only exposed port is port 21 (the default FTP port).  All connections must be in passive mode.
+* This container can be pushed to any docker repo or run from Amazon's container service or any
+other cloud service that runs docker containers.
 
 ## Important Notes
 
