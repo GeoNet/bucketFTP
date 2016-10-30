@@ -1,15 +1,10 @@
 #!/bin/bash -e
 
-# Builds Docker images for the arg list.  These must be project directories
-# where this script is executed.
+# Builds Docker images ftpserver_s3.
 #
 # Builds a statically linked executable and adds it to the container.
-# Adds the assets dir from each project to the container e.g., origin/assets
-# It is not an error for the assets dir to not exist.
-# Any assets needed by the application should be read from the assets dir
-# relative to the executable.
 #
-# usage: ./build.sh project [project]
+# usage: ./build.sh
 
 # code will be compiled in this container
 BUILD_CONTAINER=golang:1.7.0-alpine
