@@ -47,8 +47,6 @@ put/get/cd/mkdir/rename/del files and directories on S3.
 should let a user upload or download large files.
 * This is a minimal implementation, only the required FTP commands have been
 implemented: get, put, delete, ls, cd, rename, mkdir.
-* It was intended to run this from Docker but this server uses random
-port numbers which are difficult to support.
 * All dependencies are vendored using govendor.  Recent versions of Go
 should automatically use these packages making it easy to build.
 * Globbing of files (eg: *.jpg) is not supported
