@@ -1,9 +1,9 @@
 package server
 
 import (
+	"crypto/tls"
 	"io"
 	"os"
-	"crypto/tls"
 )
 
 // This file is the driver part of the server. It must be implemented by anyone wanting to use the server.
@@ -49,6 +49,9 @@ type ClientHandlingDriver interface {
 
 	// RenameFile renames a file or a directory
 	RenameFile(cc ClientContext, from, to string) error
+
+	// CanAllocate gives the approval to allocate some data
+	CanAllocate(cc ClientContext, size int) (bool, error)
 }
 
 // ClientContext is implemented on the server side to provide some access to few data around the client
@@ -68,7 +71,7 @@ type FileStream interface {
 	io.Writer
 	io.Reader
 	io.Closer
-	io.Seeker // <-- Will be used for "REST" command
+	io.Seeker
 }
 
 // Settings define all the server settings
@@ -76,6 +79,4 @@ type Settings struct {
 	Host           string // Host to receive connections on
 	Port           int    // Port to listen on
 	MaxConnections int    // Max number of connections to accept
-	MonitorOn      bool   // To activate the monitor
-	MonitorPort    int    // Port for the monitor to listen on
 }

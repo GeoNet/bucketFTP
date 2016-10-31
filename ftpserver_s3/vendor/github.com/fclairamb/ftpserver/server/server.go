@@ -1,12 +1,13 @@
+// Package server provides all the tools to build your own FTP server: The core library and the driver.
 package server
 
 import (
-	"time"
-	"net"
-	"sync"
-	"gopkg.in/inconshreveable/log15.v2"
 	"errors"
 	"fmt"
+	"gopkg.in/inconshreveable/log15.v2"
+	"net"
+	"sync"
+	"time"
 )
 
 var commandsMap map[string]func(*clientHandler)
@@ -22,7 +23,6 @@ func init() {
 	commandsMap["PASS"] = (*clientHandler).handlePASS
 
 	// File access
-	commandsMap["STAT"] = (*clientHandler).handleSTAT
 	commandsMap["SIZE"] = (*clientHandler).handleSIZE
 	commandsMap["MDTM"] = (*clientHandler).handleMDTM
 	commandsMap["RETR"] = (*clientHandler).handleRETR
@@ -31,6 +31,8 @@ func init() {
 	commandsMap["DELE"] = (*clientHandler).handleDELE
 	commandsMap["RNFR"] = (*clientHandler).handleRNFR
 	commandsMap["RNTO"] = (*clientHandler).handleRNTO
+	commandsMap["ALLO"] = (*clientHandler).handleALLO
+	commandsMap["REST"] = (*clientHandler).handleREST
 
 	// Directory handling
 	commandsMap["CWD"] = (*clientHandler).handleCWD
@@ -49,12 +51,13 @@ func init() {
 
 	// TLS handling
 	commandsMap["AUTH"] = (*clientHandler).handleAUTH
- 	commandsMap["PROT"] = (*clientHandler).handlePROT
- 	commandsMap["PBSZ"] = (*clientHandler).handlePBSZ
+	commandsMap["PROT"] = (*clientHandler).handlePROT
+	commandsMap["PBSZ"] = (*clientHandler).handlePBSZ
 
 	// Misc
 	commandsMap["FEAT"] = (*clientHandler).handleFEAT
 	commandsMap["SYST"] = (*clientHandler).handleSYST
+	commandsMap["NOOP"] = (*clientHandler).handleNOOP
 }
 
 type FtpServer struct {
@@ -88,10 +91,6 @@ func (server *FtpServer) ListenAndServe() error {
 	}
 	log15.Info("Listening...")
 
-	if server.Settings.MonitorOn {
-		go server.Monitor()
-	}
-
 	// The actual signal handler of the core program will do that (if he wants to)
 	// go signalHandler()
 
@@ -116,8 +115,8 @@ func (server *FtpServer) ListenAndServe() error {
 
 func NewFtpServer(driver ServerDriver) *FtpServer {
 	return &FtpServer{
-		driver: driver,
-		StartTime: time.Now().UTC(), // Might make sense to put it in Start method
+		driver:          driver,
+		StartTime:       time.Now().UTC(), // Might make sense to put it in Start method
 		connectionsById: make(map[uint32]*clientHandler),
 	}
 }
@@ -125,7 +124,6 @@ func NewFtpServer(driver ServerDriver) *FtpServer {
 func (server *FtpServer) Stop() {
 	server.Listener.Close()
 }
-
 
 // When a client connects, the server could refuse the connection
 func (server *FtpServer) clientArrival(c *clientHandler) error {

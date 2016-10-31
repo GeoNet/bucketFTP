@@ -1,12 +1,11 @@
 package server
 
 import (
-	"github.com/jehiah/go-strftime"
+	"fmt"
+	"io"
+	"os"
 	"path"
 	"strings"
-	"fmt"
-	"os"
-	"io"
 )
 
 func (c *clientHandler) absPath(p string) string {
@@ -61,7 +60,7 @@ func (c *clientHandler) handleRMD() {
 func (c *clientHandler) handleCDUP() {
 	parent, _ := path.Split(c.Path())
 	if parent != "/" && strings.HasSuffix(parent, "/") {
-		parent = parent[0:len(parent)-1]
+		parent = parent[0 : len(parent)-1]
 	}
 	if err := c.driver.ChangeDirectory(c, parent); err == nil {
 		c.SetPath(parent)
@@ -72,7 +71,7 @@ func (c *clientHandler) handleCDUP() {
 }
 
 func (c *clientHandler) handlePWD() {
-	c.writeMessage(257, "\"" + c.Path() + "\" is the current directory")
+	c.writeMessage(257, "\""+c.Path()+"\" is the current directory")
 }
 
 func (c *clientHandler) handleLIST() {
@@ -86,17 +85,14 @@ func (c *clientHandler) handleLIST() {
 	}
 }
 
-// TODO: Implement this
-func (c *clientHandler) handleSTAT() {
-	c.writeMessage(500, "STAT not implement")
-}
-
 func (c *clientHandler) dirList(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
 		fmt.Fprint(w, file.Mode().String())
 		fmt.Fprintf(w, " 1 %s %s ", "ftp", "ftp")
 		fmt.Fprintf(w, "%12d", file.Size())
-		fmt.Fprintf(w, strftime.Format(" %b %d %H:%M ", file.ModTime()))
+		// There's no real reason to keep this strftime dependency
+		// fmt.Fprintf(w, strftime.Format(" %b %d %H:%M ", file.ModTime()))
+		fmt.Fprintf(w, file.ModTime().Format(" Jan _2 15:04 "))
 		fmt.Fprintf(w, "%s\r\n", file.Name())
 	}
 	fmt.Fprint(w, "\r\n")

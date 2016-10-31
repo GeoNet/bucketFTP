@@ -1,8 +1,8 @@
 package server
 
 import (
-	"crypto/tls"
 	"bufio"
+	"crypto/tls"
 	"fmt"
 )
 
@@ -31,10 +31,15 @@ func (c *clientHandler) handleSYST() {
 	c.writeMessage(215, "UNIX Type: L8")
 }
 
+func (c *clientHandler) handleNOOP() {
+	c.writeMessage(200, "OK")
+}
+
 func (c *clientHandler) handleFEAT() {
 	c.writer.WriteString("211- These are my features\r\n")
 
 	c.writer.WriteString(" UTF8\r\n")
+	c.writer.WriteString(" SIZE\r\n")
 
 	c.writeMessage(211, "end")
 }

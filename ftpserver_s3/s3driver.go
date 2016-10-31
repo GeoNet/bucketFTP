@@ -373,8 +373,6 @@ func (d *S3Driver) GetSettings() *server.Settings {
 		Host:           "0.0.0.0",
 		Port:           FTP_PORT,
 		MaxConnections: 300,
-		MonitorOn:      true,
-		MonitorPort:    3379,
 	}
 	return &config
 }
