@@ -7,13 +7,14 @@ Apache 2.0 license.
 
 ## Security
 
-FTP is an insecure protocol.  We use specialised hardware that only supports FTP. 
-We strongly recommend using a private network when using FTP.
+FTP is an insecure protocol.  We use specialised hardware that only supports 
+FTP so are forced to use it.  We strongly recommend using a private network 
+when using FTP.
 
 User auth is extremely simple.  It's checking against environment variables.
 This will likely change in the future.  One option would be to use the S3 
 credentials for the username/password, but we didn't want these accidentally 
-transmitted in plain text.
+transmitted over the internet in plain text.
 
 TLS is not currently implemented but is supported by the upstream ftp server.
 
@@ -53,7 +54,8 @@ using the name of the container you just built as the last argument.  This will 
 in a terminal with stderr/stdout being printed to the screen.
 * The only exposed port is port 21 (the default FTP port).  All connections must be in passive mode.
 * This container can be pushed to any docker repo or run from Amazon's container service or any
-other cloud service that runs docker containers.
+other cloud service that runs docker containers.  Managing config as environment variables keeps 
+this docker friendly.
 
 ## Important Notes
 
@@ -64,8 +66,8 @@ should let a user upload or download large files.
 implemented: get, put, delete, ls, cd, rename, mkdir.
 * All dependencies are vendored using govendor.  Recent versions of Go
 should automatically use these packages making it easy to build.
-* Globbing of files (eg: *.jpg) is not supported
+* Globbing of files (eg: *.jpg) is not supported.
+* Symbolic links are unsupported and will be ignored.
 * AWS limits the number of objects returned in certain operations such as 
 ListObjectsV2.  The limit is currently hardcoded to 10000.  This will cause
-problems if you're transferring or modifying directories with more than this
-number of files.
+problems if you exceed this limit.

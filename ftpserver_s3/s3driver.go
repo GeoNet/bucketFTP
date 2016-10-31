@@ -18,7 +18,7 @@ import (
 type S3Driver struct {
 	s3Session *session.Session
 	s3Service *s3.S3
-	maxKeys int64
+	maxKeys   int64
 }
 
 func (d *S3Driver) WelcomeUser(cc server.ClientContext) (string, error) {
@@ -123,7 +123,7 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 		Bucket:    &S3_BUCKET_NAME,
 		Prefix:    &prefix,
 		Delimiter: &delimiter,
-		MaxKeys: &d.maxKeys,
+		MaxKeys:   &d.maxKeys,
 	}
 
 	var resp *s3.ListObjectsV2Output
@@ -264,8 +264,8 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 	}
 
 	listParams := &s3.ListObjectsV2Input{
-		Bucket: &S3_BUCKET_NAME,
-		Prefix: &relPath,
+		Bucket:  &S3_BUCKET_NAME,
+		Prefix:  &relPath,
 		MaxKeys: &d.maxKeys,
 		//Delimiter: &delimiter, // empty delim makes this recursive
 	}
@@ -344,8 +344,8 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	}
 
 	listParams := &s3.ListObjectsV2Input{
-		Bucket: &S3_BUCKET_NAME,
-		Prefix: &relFrom,
+		Bucket:  &S3_BUCKET_NAME,
+		Prefix:  &relFrom,
 		MaxKeys: &d.maxKeys,
 	}
 
