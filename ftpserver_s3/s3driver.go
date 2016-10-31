@@ -165,23 +165,38 @@ func (d *S3Driver) OpenFile(cc server.ClientContext, path string, flag int) (ser
 	return s3file, nil
 }
 
-func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInfo, error) {
-
-	var err error
-	var relPath string
-	if relPath, err = getS3Key(path); err != nil {
-		return nil, err
-	}
-
+func (d *S3Driver) getObjectInfo(key string) (*s3.GetObjectOutput, error) {
 	params := &s3.GetObjectInput{
 		Bucket: &S3_BUCKET_NAME,
-		Key:    &relPath,
+		Key:    &key,
 	}
 
 	req, resp := d.s3Service.GetObjectRequest(params)
 
 	if err := req.Send(); err != nil {
 		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInfo, error) {
+
+	var err error
+	relPath := path
+	if relPath, err = getS3Key(path); err != nil {
+		return nil, err
+	}
+
+	var resp *s3.GetObjectOutput
+	// check for directories (trailing slashes) if we can't find the file
+	if resp, err = d.getObjectInfo(relPath); err != nil {
+
+		if resp, err = d.getObjectInfo(relPath + "/"); err != nil {
+			relPath += "/"
+		} else {
+			return nil, err
+		}
 	}
 
 	// resp.ContentLength and LastModified are sometimes nil (!) so check for this state
@@ -226,13 +241,13 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 		return err
 	}
 
-	if isDir {
+	if isDir && !strings.HasSuffix(relPath, "/") {
 		relPath += "/"
 	}
 
 	listParams := &s3.ListObjectsV2Input{
-		Bucket:    &S3_BUCKET_NAME,
-		Prefix:    &relPath,
+		Bucket: &S3_BUCKET_NAME,
+		Prefix: &relPath,
 		//Delimiter: &delimiter, // empty delim makes this recursive
 	}
 
@@ -243,12 +258,12 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 
 	var delObjects []*s3.ObjectIdentifier
 	for _, f := range resp.Contents {
-		delObjects = append(delObjects, &s3.ObjectIdentifier{Key:f.Key})
+		delObjects = append(delObjects, &s3.ObjectIdentifier{Key: f.Key})
 	}
 
 	delParams := &s3.DeleteObjectsInput{
 		Bucket: &S3_BUCKET_NAME,
-		Delete: &s3.Delete{Objects:delObjects},
+		Delete: &s3.Delete{Objects: delObjects},
 	}
 
 	if _, err = d.s3Service.DeleteObjects(delParams); err != nil {
@@ -261,23 +276,19 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 // returns true or false depending on if the path exists as a file (no trailing slash) or a directory (trailing slash)
 // in S3.
 func (d *S3Driver) isS3Dir(path string) (bool, error) {
-	var err, errFile, errDir error
+	var err error
 	var s3Path string
-
-	log.Println("DEBUG", path)
 	if s3Path, err = getS3Key(path); err != nil {
 		return false, err
 	}
 
-	// see if it's file
-	_, errFile = d.GetFileInfo(nil, s3Path)
-	if errFile == nil {
+	_, err = d.getObjectInfo(s3Path)
+	if err == nil {
 		return false, nil
 	}
 
-	// see if it's a directory
-	_, errDir = d.GetFileInfo(nil, s3Path + "/")
-	if errDir == nil {
+	_, err = d.getObjectInfo(s3Path + "/")
+	if err == nil {
 		return true, nil
 	}
 
@@ -285,30 +296,72 @@ func (d *S3Driver) isS3Dir(path string) (bool, error) {
 }
 
 func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
-	// S3 doesn't have rename (or move) so we need to copy (CopyObject) and delete the old one (DeleteObject).
+	// S3 doesn't have rename (or move).  We're copying all objects that match the input file or directory key
+	// to the new key name
+
 	var err error
-	var relFrom string
+	var relFrom, relTo string
+
 	if relFrom, err = getS3Key(from); err != nil {
 		return err
 	}
 
-	var relTo string
 	if relTo, err = getS3Key(to); err != nil {
 		return err
 	}
 
-	copySrc := S3_BUCKET_NAME + "/" + relFrom
-	copyParams := &s3.CopyObjectInput{
-		Bucket:     &S3_BUCKET_NAME,
-		Key:        &relTo,
-		CopySource: &copySrc,
-	}
-
-	if _, err = d.s3Service.CopyObject(copyParams); err != nil {
+	var isDir bool
+	if isDir, err = d.isS3Dir(relFrom); err != nil {
 		return err
 	}
 
-	if err = d.DeleteFile(cc, from); err != nil {
+	if isDir {
+		if !strings.HasSuffix(relFrom, "/") {
+			relFrom += "/"
+		}
+		if !strings.HasSuffix(relTo, "/") {
+			relTo += "/"
+		}
+	}
+
+	listParams := &s3.ListObjectsV2Input{
+		Bucket: &S3_BUCKET_NAME,
+		Prefix: &relFrom,
+	}
+
+	var resp *s3.ListObjectsV2Output
+	if resp, err = d.s3Service.ListObjectsV2(listParams); err != nil {
+		return err
+	}
+
+	var srcObjects []*s3.ObjectIdentifier
+	for _, f := range resp.Contents {
+		srcObjects = append(srcObjects, &s3.ObjectIdentifier{Key: f.Key})
+	}
+
+	// copy all destinations objects from source to dest (already ordered from top level directory key)
+	for _, objId := range srcObjects {
+
+		toPath := strings.Replace(*objId.Key, relFrom, relTo, 1)
+		copySrc := S3_BUCKET_NAME + "/" + *objId.Key
+		copyParams := &s3.CopyObjectInput{
+			Bucket:     &S3_BUCKET_NAME,
+			Key:        &toPath,
+			CopySource: &copySrc,
+		}
+
+		if _, err = d.s3Service.CopyObject(copyParams); err != nil {
+			return err
+		}
+	}
+
+	// delete original file (or nested directory of matching keys).  Faster than looping over them.
+	delParams := &s3.DeleteObjectsInput{
+		Bucket: &S3_BUCKET_NAME,
+		Delete: &s3.Delete{Objects: srcObjects},
+	}
+
+	if _, err = d.s3Service.DeleteObjects(delParams); err != nil {
 		return err
 	}
 
