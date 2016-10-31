@@ -65,3 +65,7 @@ implemented: get, put, delete, ls, cd, rename, mkdir.
 * All dependencies are vendored using govendor.  Recent versions of Go
 should automatically use these packages making it easy to build.
 * Globbing of files (eg: *.jpg) is not supported
+* AWS limits the number of objects returned in certain operations such as 
+ListObjectsV2.  The limit is currently hardcoded to 10000.  This will cause
+problems if you're transferring or modifying directories with more than this
+number of files.

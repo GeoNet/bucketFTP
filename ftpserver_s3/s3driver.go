@@ -16,9 +16,9 @@ import (
 )
 
 type S3Driver struct {
-	baseDir   string
 	s3Session *session.Session
 	s3Service *s3.S3
+	maxKeys int64
 }
 
 func (d *S3Driver) WelcomeUser(cc server.ClientContext) (string, error) {
@@ -52,19 +52,18 @@ func (d *S3Driver) GetTLSConfig() (*tls.Config, error) {
 }
 
 func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) error {
-	// Query S3 to see if the directory exists.  If it does update the baseDir variable to emulate cd-ing to that
-	// directory
+	// Query S3 to see if the directory exists.  We return an error if we cannot list it.
 
 	var err error
-	var dirname string
-	if dirname, err = getS3Key(directory + "/"); err != nil {
+	var prefix string
+	if prefix, err = getS3Key(directory + "/"); err != nil {
 		return err
 	}
 
 	delimiter := "/"
 	params := &s3.ListObjectsV2Input{
 		Bucket:    &S3_BUCKET_NAME,
-		Prefix:    &dirname,
+		Prefix:    &prefix,
 		Delimiter: &delimiter, // limits the search to directories (they have a trailing slash)
 	}
 
@@ -73,11 +72,14 @@ func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) er
 		return err
 	}
 
+	// prefix of "" is a special case, the root directory of a bucket which can have zero objects
+	if prefix == "" {
+		return nil
+	}
+
 	if *resp.KeyCount == 0 {
 		return errors.New("No such directory: " + directory)
 	}
-
-	d.baseDir = dirname
 
 	return nil
 }
@@ -105,14 +107,25 @@ func (d *S3Driver) MakeDirectory(cc server.ClientContext, directory string) erro
 
 func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
+	var err error
+	var prefix string
+	if prefix, err = getS3Key(cc.Path()); err != nil {
+		return nil, err
+	}
+
+	// all dirs in S3 apart from root dir should end with /
+	if len(prefix) > 0 {
+		prefix += "/"
+	}
+
 	delimiter := "/" // delimiter keeps the listing from being recursive
 	params := &s3.ListObjectsV2Input{
 		Bucket:    &S3_BUCKET_NAME,
-		Prefix:    &d.baseDir,
+		Prefix:    &prefix,
 		Delimiter: &delimiter,
+		MaxKeys: &d.maxKeys,
 	}
 
-	var err error
 	var resp *s3.ListObjectsV2Output
 	if resp, err = d.s3Service.ListObjectsV2(params); err != nil {
 		return nil, err
@@ -135,7 +148,7 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 	for _, f := range resp.Contents {
 
 		// don't list CWD in the list of files
-		if *f.Key == d.baseDir {
+		if *f.Key == prefix {
 			continue
 		}
 
@@ -193,13 +206,19 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 	if resp, err = d.getObjectInfo(relPath); err != nil {
 
 		if resp, err = d.getObjectInfo(relPath + "/"); err != nil {
-			relPath += "/"
-		} else {
 			return nil, err
+		} else {
+			relPath += "/"
 		}
 	}
 
-	// resp.ContentLength and LastModified are sometimes nil (!) so check for this state
+	var f os.FileInfo
+
+	// resp itself, resp.ContentLength and resp.LastModified are sometimes nil (!) so check for this state.  Aws!
+	if resp == nil {
+		return nil, fmt.Errorf("Error getting file info for key: %s", relPath)
+	}
+
 	var objectSize int64
 	if resp.ContentLength != nil {
 		objectSize = *resp.ContentLength
@@ -210,7 +229,6 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 		modTime = *resp.LastModified
 	}
 
-	var f os.FileInfo
 	if f, err = d.getFakeFileInfo(relPath, objectSize, modTime); err != nil {
 		return nil, err
 	}
@@ -248,6 +266,7 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 	listParams := &s3.ListObjectsV2Input{
 		Bucket: &S3_BUCKET_NAME,
 		Prefix: &relPath,
+		MaxKeys: &d.maxKeys,
 		//Delimiter: &delimiter, // empty delim makes this recursive
 	}
 
@@ -327,6 +346,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	listParams := &s3.ListObjectsV2Input{
 		Bucket: &S3_BUCKET_NAME,
 		Prefix: &relFrom,
+		MaxKeys: &d.maxKeys,
 	}
 
 	var resp *s3.ListObjectsV2Output
@@ -379,15 +399,6 @@ func (d *S3Driver) GetSettings() *server.Settings {
 
 // Return a fakeInfo struct that satisfies the os.FileInfo interface, emulating a file from an S3 object
 func (d *S3Driver) getFakeFileInfo(name string, size int64, modTime time.Time) (os.FileInfo, error) {
-	var err error
-
-	displayPath := name
-	// make the path we display relative to the current working directory
-	if strings.HasPrefix(displayPath, d.baseDir) {
-		if displayPath, err = filepath.Rel(d.baseDir, displayPath); err != nil {
-			return nil, err
-		}
-	}
 
 	isDir := strings.HasSuffix(name, "/")
 
@@ -397,7 +408,7 @@ func (d *S3Driver) getFakeFileInfo(name string, size int64, modTime time.Time) (
 	}
 
 	f := fakeInfo{
-		name:    displayPath,
+		name:    filepath.Base(name),
 		size:    size,
 		mode:    mode,
 		modTime: modTime,
@@ -411,7 +422,7 @@ func NewS3Driver() (*S3Driver, error) {
 
 	var err error
 
-	driver := &S3Driver{}
+	driver := &S3Driver{maxKeys: 10000}
 
 	if driver.s3Session, err = session.NewSession(); err != nil {
 		log.Println("error creating S3 session:", err)
@@ -419,8 +430,6 @@ func NewS3Driver() (*S3Driver, error) {
 	}
 
 	driver.s3Service = s3.New(driver.s3Session)
-
-	driver.baseDir = ""
 
 	return driver, nil
 }
