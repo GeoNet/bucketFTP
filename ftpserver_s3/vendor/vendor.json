@@ -184,6 +184,12 @@
 			"revisionTime": "2015-12-06T19:48:10Z"
 		},
 		{
+			"checksumSHA1": "28nznojcl6Ejtm6I1tKozgy0isg=",
+			"path": "github.com/jlaffaye/ftp",
+			"revision": "025815df64030c144b86e368fedf80ee195fe464",
+			"revisionTime": "2016-02-29T21:52:38Z"
+		},
+		{
 			"checksumSHA1": "0ZrwvB6KoGPj2PoDNSEJwxQ6Mog=",
 			"origin": "github.com/aws/aws-sdk-go/vendor/github.com/jmespath/go-jmespath",
 			"path": "github.com/jmespath/go-jmespath",

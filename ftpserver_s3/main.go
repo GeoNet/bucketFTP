@@ -1,14 +1,14 @@
 package main
 
 import (
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/fclairamb/ftpserver/server"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 var (

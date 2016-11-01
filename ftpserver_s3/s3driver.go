@@ -425,7 +425,7 @@ func (d *S3Driver) getFakeFileInfo(name string, size int64, modTime time.Time) (
 func NewS3Driver(s3Session *session.Session, s3Service *s3.S3) (*S3Driver, error) {
 
 	driver := &S3Driver{
-		maxKeys: 10000,
+		maxKeys:   10000,
 		s3Service: s3Service,
 		s3Session: s3Session,
 	}
