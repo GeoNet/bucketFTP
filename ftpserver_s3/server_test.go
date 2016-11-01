@@ -1,20 +1,20 @@
 package main
 
 import (
-	"github.com/jlaffaye/ftp"
-	"testing"
-	"time"
-	"os"
 	"bytes"
+	"github.com/jlaffaye/ftp"
 	"io"
 	"io/ioutil"
+	"os"
+	"testing"
+	"time"
 )
 
 // Integration style tests for the FTP server.  This requires the server to be running
 // on localhost and the variables in env.list to be exported (eg: FTP_PORT, etc).
 
 func getClient(doLogin bool) (*ftp.ServerConn, error) {
-	c, err := ftp.DialTimeout("localhost:3000", time.Second)
+	c, err := ftp.DialTimeout("localhost:"+os.Getenv("FTP_PORT"), time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func getClient(doLogin bool) (*ftp.ServerConn, error) {
 	return c, nil
 }
 
-// test that we can connect to the server (in passive mode)
+// test that we can connect to the server
 func TestLogin(t *testing.T) {
 
 	var err error
