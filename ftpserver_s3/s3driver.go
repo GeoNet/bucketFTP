@@ -113,8 +113,8 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 		return nil, err
 	}
 
-	// all dirs in S3 apart from root dir should end with /
-	if len(prefix) > 0 {
+	// all dirs in S3 apart from root dir should end with /. Non standard between ftp clients.
+	if len(prefix) > 0 && !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
 
@@ -212,8 +212,6 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 		}
 	}
 
-	var f os.FileInfo
-
 	// resp itself, resp.ContentLength and resp.LastModified are sometimes nil (!) so check for this state.  Aws!
 	if resp == nil {
 		return nil, fmt.Errorf("Error getting file info for key: %s", relPath)
@@ -222,6 +220,11 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 	var objectSize int64
 	if resp.ContentLength != nil {
 		objectSize = *resp.ContentLength
+
+		if strings.HasSuffix(relPath, "/") {
+			// the size of a directory, just faking it.
+			objectSize = 4096
+		}
 	}
 
 	var modTime time.Time
@@ -229,6 +232,7 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 		modTime = *resp.LastModified
 	}
 
+	var f os.FileInfo
 	if f, err = d.getFakeFileInfo(relPath, objectSize, modTime); err != nil {
 		return nil, err
 	}

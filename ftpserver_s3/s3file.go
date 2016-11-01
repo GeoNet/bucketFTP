@@ -57,8 +57,8 @@ func (f *S3VirtualFile) Close() error {
 }
 
 func (f *S3VirtualFile) Read(buffer []byte) (int, error) {
-	// Reading using s3.GetObject instead of s3manager.Downloader.  This won't read concurrently but it will let
-	// us avoid reading the entire file in memory or on disk which is crucial.
+	// Reading using s3.GetObject instead of s3manager.Downloader.  We could use WriteAtBuffer to buffer internally
+	// but this approach avoids buffering of data on this ftp server.
 	var err error
 	if !f.s3FileIsRead {
 		params := &s3.GetObjectInput{
@@ -74,6 +74,7 @@ func (f *S3VirtualFile) Read(buffer []byte) (int, error) {
 	}
 
 	return f.s3FileOutput.Body.Read(buffer)
+
 }
 
 func (f *S3VirtualFile) Seek(n int64, w int) (int64, error) {
