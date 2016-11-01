@@ -422,18 +422,13 @@ func (d *S3Driver) getFakeFileInfo(name string, size int64, modTime time.Time) (
 	return f, nil
 }
 
-func NewS3Driver() (*S3Driver, error) {
+func NewS3Driver(s3Session *session.Session, s3Service *s3.S3) (*S3Driver, error) {
 
-	var err error
-
-	driver := &S3Driver{maxKeys: 10000}
-
-	if driver.s3Session, err = session.NewSession(); err != nil {
-		log.Println("error creating S3 session:", err)
-		return nil, err
+	driver := &S3Driver{
+		maxKeys: 10000,
+		s3Service: s3Service,
+		s3Session: s3Session,
 	}
-
-	driver.s3Service = s3.New(driver.s3Session)
 
 	return driver, nil
 }

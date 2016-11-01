@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 var (
@@ -38,8 +40,16 @@ func init() {
 
 func main() {
 	var err error
+
+	var s3Session *session.Session
+	if s3Session, err = session.NewSession(); err != nil {
+		log.Fatal("error creating S3 session", err)
+	}
+
+	s3Service := s3.New(s3Session)
+
 	var driver *S3Driver
-	if driver, err = NewS3Driver(); err != nil {
+	if driver, err = NewS3Driver(s3Session, s3Service); err != nil {
 		log.Fatal("error creating S3 FTP driver", err)
 	}
 
