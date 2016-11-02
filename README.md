@@ -48,14 +48,23 @@ put/get/cd/mkdir/rename/del files and directories on S3.
 builds in the Alpine Go container and creates a new scratch based container containing the FTP 
 server executable and ssl certs required by the AWS SDK.
 * it should report something similar to "Successfully built b5245065b234"
-* run the container with the command `docker run -p21:21 --env-file env.list -it b5245065b234` 
-(or `docker run --network=host --env-file env.list -it b5245065b234` for running the tests), 
+* run the container with the command `docker run -p21:21 --env-file env.list -it b5245065b234`, 
 using the name of the container you just built as the last argument.  This will run the server
 in a terminal with stderr/stdout being printed to the screen.
 * The only exposed port is port 21 (the default FTP port).  All connections must be in passive mode.
 * This container can be pushed to any docker repo or run from Amazon's container service or any
 other cloud service that runs docker containers.  Managing config as environment variables keeps 
 this docker friendly.
+
+## Running the tests
+
+* High level integration style tests have been added.  These tests are run while the FTP server is
+running on the local machine (localhost).  They upload, download and modify test files on an S3 
+bucket.
+* Build and run the FTP server as mentioned above then run the tests with the command `go test`
+* Export the variables in env.list.  The tests require these variables.
+* If you're testing against the FTP server running in Docker, run the container with the command 
+`docker run --network host --env-file env.list -it <container_id>`.
 
 ## Important Notes
 

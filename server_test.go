@@ -99,8 +99,7 @@ func TestDirs(t *testing.T) {
 	newDir := "newdir"
 	expectedCwd := "/newdir"
 	if err = c.MakeDir(newDir); err != nil {
-		// c.MakeDir seems to return a non-nil error on success.  Strange, probably the ftpserver package
-		//t.Error(err)
+		t.Error(err)
 	}
 
 	if err = c.ChangeDir(newDir); err != nil {
@@ -190,13 +189,11 @@ func TestDirRenameDelete(t *testing.T) {
 	dirB := "/dirB"
 	newDirA := "/dirB/subdir"
 	if err = c.MakeDir(dirA); err != nil {
-		// c.MakeDir seems to return a non-nil error on success.  Strange, probably the ftpserver package
-		//t.Error(err)
+		t.Error(err)
 	}
 
 	if err = c.MakeDir(dirB); err != nil {
-		// c.MakeDir seems to return a non-nil error on success.  Strange, probably the ftpserver package
-		//t.Error(err)
+		t.Error(err)
 	}
 
 	if err = c.ChangeDir(dirA); err != nil {

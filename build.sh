@@ -28,20 +28,14 @@ docker run --rm -v "$PWD":"$PWD" ${BUILD_CONTAINER} \
 #for i in "$@"
 #do
 pkgname=${CWD}
-docker run -e "GOBIN=/usr/src/go/src/github.com/GeoNet/devx/${pkgname}/${DOCKER_TMP}" -e GOPATH=/usr/src/go -e "CGO_ENABLED=0" -e "GOOS=linux" -e "BUILD=$BUILD" --rm \
-    -v "$PWD":/usr/src/go/src/github.com/GeoNet/devx/${pkgname} \
-    -w /usr/src/go/src/github.com/GeoNet/devx/${pkgname} ${BUILD_CONTAINER} \
+docker run -e "GOBIN=/usr/src/go/src/github.com/GeoNet/${pkgname}/${DOCKER_TMP}" -e GOPATH=/usr/src/go -e "CGO_ENABLED=0" -e "GOOS=linux" -e "BUILD=$BUILD" --rm \
+    -v "$PWD":/usr/src/go/src/github.com/GeoNet/${pkgname} \
+    -w /usr/src/go/src/github.com/GeoNet/${pkgname} ${BUILD_CONTAINER} \
     go install -a -ldflags "-X main.Prefix=${pkgname}/${VERSION}" -installsuffix cgo .
 
 cp Dockerfile ${DOCKER_TMP}
 cd ${DOCKER_TMP}
-docker build .
+docker build -t bucketftp:latest .
 cd ..
-
-# TODO: add tagging here for easy pushing to AWS's ECR
-## tag latest.  Makes it easier to test with compose.
-#docker tag 862640294325.dkr.ecr.ap-southeast-2.amazonaws.com/${i}:$VERSION 862640294325.dkr.ecr.ap-southeast-2.amazonaws.com/${i}:latest
-
-# run with:  docker run --env-file env_test.list -p3000:21 <image_name>
 
 rm -rf ${DOCKER_TMP}
