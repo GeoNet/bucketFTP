@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-# Builds Docker images ftpserver_s3.
+# Builds Docker images bucketFTP
 #
 # Builds a statically linked executable and adds it to the container.
 #

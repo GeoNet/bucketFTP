@@ -1,4 +1,4 @@
-# FTP Server for S3
+# Overview
 
 This is a Go implementation of an FTP server which uses Amazon S3 for storage
 of files.  It's easy to build and supports basic FTP commands such as get, put, 
@@ -32,11 +32,10 @@ be set when running the FTP server (These are available from the AWS console for
 ## Quickstart
 
 * clone this git repo (or download the archive) from github.com
-* cd to the ftpserver_s3 directory
 * run the command `go build`
 * open the file env.list.  Export each environment variable listed with the appropriate
 value.  Eg: `export FTP_PORT=3000`.  You will need valid AWS credentials.
-* run the ftpserver: `./ftpserver_s3`
+* run the ftpserver: `./bucketFTP`
 * use an FTP client to connect to your running server, eg on Linux connect to the ftp
 server running on localhost at port 3000: `ftp -p localhost 3000`
 * You can then use the FTP client (eg: command line ftp or FileZilla) to 
@@ -49,7 +48,8 @@ put/get/cd/mkdir/rename/del files and directories on S3.
 builds in the Alpine Go container and creates a new scratch based container containing the FTP 
 server executable and ssl certs required by the AWS SDK.
 * it should report something similar to "Successfully built b5245065b234"
-* run the container with the command `docker run -p21:21 --env-file env.list -it b5245065b234`, 
+* run the container with the command `docker run -p21:21 --env-file env.list -it b5245065b234` 
+(or `docker run --network=host --env-file env.list -it b5245065b234` for running the tests), 
 using the name of the container you just built as the last argument.  This will run the server
 in a terminal with stderr/stdout being printed to the screen.
 * The only exposed port is port 21 (the default FTP port).  All connections must be in passive mode.
@@ -67,7 +67,8 @@ implemented: get, put, delete, ls, cd, rename, mkdir.
 * All dependencies are vendored using govendor.  Recent versions of Go
 should automatically use these packages making it easy to build.
 * Globbing of files (eg: *.jpg) is not supported.
-* Symbolic links are unsupported and will be ignored.
+* Symbolic links are unsupported.
 * AWS limits the number of objects returned in certain operations such as 
 ListObjectsV2.  The limit is currently hardcoded to 10000.  This will cause
 problems if you exceed this limit.
+* This project is currently experimental.

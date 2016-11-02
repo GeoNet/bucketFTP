@@ -221,5 +221,5 @@
 			"revisionTime": "2015-09-21T21:38:54Z"
 		}
 	],
-	"rootPath": "github.com/GeoNet/devx/ftpserver_s3"
+	"rootPath": "github.com/GeoNet/bucketFTP"
 }
