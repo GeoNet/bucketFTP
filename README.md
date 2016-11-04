@@ -16,7 +16,8 @@ This will likely change in the future.  One option would be to use the S3
 credentials for the username/password, but we didn't want these accidentally 
 transmitted over the internet in plain text.
 
-TLS is not currently implemented but is supported by the upstream ftp server.
+TLS is not currently implemented but is supported by the upstream ftp server
+package.
 
 File modes on S3 are faked.  Attempting to read or modify a file on S3 with
 insufficient permissions will raise an error.
@@ -58,13 +59,26 @@ this docker friendly.
 
 ## Running the tests
 
-* High level integration style tests have been added.  These tests are run while the FTP server is
+High level integration style tests have been added.  These tests are run while the FTP server is
 running on the local machine (localhost).  They upload, download and modify test files on an S3 
 bucket.
-* Build and run the FTP server as mentioned above then run the tests with the command `go test`
+
+### Testing with Docker
+
+* Build the docker container as mentioned above
+* Run the bucketFTP server in host networking mode with the command 
+`docker run --network host --env-file env.list -it <container_id>`.  Dockers default bridge networking 
+mode causes a network conflict with the test FTP client when both are running on localhost.
+* Run the tests outside of the docker container with the command `go test`, it will connect to the bucketFTP
+server on localhost:FTP_PORT.
+
+### Testing without Docker
+
 * Export the variables in env.list.  The tests require these variables.
-* If you're testing against the FTP server running in Docker, run the container with the command 
-`docker run --network host --env-file env.list -it <container_id>`.
+* Build and run the FTP server as mentioned above, eg `go build && ./bucketFTP`
+* Run the tests with the command `go test`.
+* Both the server and tests need to have the environment variables in env.list
+set correctly and exported.
 
 ## Important Notes
 
@@ -76,8 +90,8 @@ implemented: get, put, delete, ls, cd, rename, mkdir.
 * All dependencies are vendored using govendor.  Recent versions of Go
 should automatically use these packages making it easy to build.
 * Globbing of files (eg: *.jpg) is not supported.
-* Symbolic links are unsupported.
+* Symbolic links are not supported.
 * AWS limits the number of objects returned in certain operations such as 
 ListObjectsV2.  The limit is currently hardcoded to 10000.  This will cause
 problems if you exceed this limit.
-* This project is currently experimental.
+* This project is currently experimental but coming along quickly.
