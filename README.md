@@ -45,13 +45,13 @@ put/get/cd/mkdir/rename/del files and directories on S3.
 ## Building and running from Docker
 
 * Install and test Docker on your system.
-* build the docker container using the script (on systems supporting bash): `./build.sh`.  This
+* Build the docker container using the script (on systems supporting bash): `./build.sh`.  This
 builds in the Alpine Go container and creates a new scratch based container containing the FTP 
 server executable and ssl certs required by the AWS SDK.
-* it should report something similar to "Successfully built b5245065b234"
-* run the container with the command `docker run -p21:21 --env-file env.list -it b5245065b234`, 
-using the name of the container you just built as the last argument.  This will run the server
-in a terminal with stderr/stdout being printed to the screen.
+* It should report something similar to "Successfully built b5245065b234".  It tags the build as
+bucketftp:latest.
+* Run the container with the command `docker run -p21:21 --env-file env.list -it bucketftp:latest`. 
+This will run the server in a terminal with stderr/stdout being printed to the screen.
 * The only exposed port is port 21 (the default FTP port).  All connections must be in passive mode.
 * This container can be pushed to any docker repo or run from Amazon's container service or any
 other cloud service that runs docker containers.  Managing config as environment variables keeps 
@@ -67,18 +67,18 @@ bucket.
 
 * Build the docker container as mentioned above
 * Run the bucketFTP server in host networking mode with the command 
-`docker run --network host --env-file env.list -it <container_id>`.  Dockers default bridge networking 
-mode causes a network conflict with the test FTP client when both are running on localhost.
+`docker run --network host --env-file env.list -it bucketftp:latest`.  Docker's default bridge networking 
+mode causes a conflict with the test FTP client when both are running on localhost.  Host networking mode
+avoids this.
 * Run the tests outside of the docker container with the command `go test`, it will connect to the bucketFTP
 server on localhost:FTP_PORT.
 
 ### Testing without Docker
 
-* Export the variables in env.list.  The tests require these variables.
-* Build and run the FTP server as mentioned above, eg `go build && ./bucketFTP`
-* Run the tests with the command `go test`.
-* Both the server and tests need to have the environment variables in env.list
-set correctly and exported.
+* Export the variables in env.list.  Both the server and tests need to have the 
+environment variables in env.list set correctly and exported.
+* Build and run the FTP server as mentioned above, eg `go build && ./bucketFTP`.
+* Run the tests in a separate terminal with the command `go test`.
 
 ## Important Notes
 
