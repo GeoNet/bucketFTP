@@ -80,6 +80,29 @@ environment variables in env.list set correctly and exported.
 * Build and run the FTP server as mentioned above, eg `go build && ./bucketFTP`.
 * Run the tests in a separate terminal with the command `go test`.
 
+## Contributing pull requests
+
+Sensitive environment variables are stored as encrypted variables in Travis CI, 
+for things such as the test S3 bucket credentials.  Creating a pull request from
+a fork of this repo will cause the tests to fail due to missing environment 
+variables.  See this [link](https://docs.travis-ci.com/user/pull-requests) and
+this other [link](https://blog.travis-ci.com/2014-08-22-environment-variables/) 
+for more info.
+
+If you have created a fork of this repo you can push that branch to a branch of 
+the same name on the github.com/GeoNet/bucketFTP repo in addition to your github 
+fork.  This requires that you have write access to the GeoNet/bucketFTP
+repo.  Once you've pushed to the GeoNet repo you can create a pull request 
+from the newly pushed branch on GeoNet/bucketFTP.  This will use the encrypted
+environment variables.
+
+If you don't have write access for the GeoNet/bucketFTP repo you can set up a new 
+Travis build for you forked repo on travis-ci.org. You will need to specify custom 
+environment variables in your Travis job for FTP_PASSWD (can be anything, it's just 
+used for testing in Travis), AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.  These must 
+belong to an AWS user that can read and write objects to the bucket specified in the 
+S3_BUCKET_NAME environment variable.
+
 ## Important Notes
 
 * Active FTP transfers are not supported, only passive FTP.
