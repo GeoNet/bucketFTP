@@ -14,80 +14,49 @@ import (
 )
 
 type S3VirtualFile struct {
+	flag         int
 	s3Session    *session.Session
-	s3Service    *s3.S3
+	s3Client     *s3.S3
 	s3Path       string // the S3 key
-	s3FileOpen   bool   // only write to S3 if we've seen this flag
-	s3FileIsRead bool
+	s3WriterOpen bool   // only write to S3 if we've seen this flag
+	s3ReaderOpen bool
 	s3FileOutput *s3.GetObjectOutput
 	readPipe     *io.PipeReader
 	writePipe    *io.PipeWriter
 	uploadErr    chan error
 }
 
-func NewS3VirtualFile(path string, session *session.Session, service *s3.S3) (*S3VirtualFile, error) {
-	f := &S3VirtualFile{s3Path: path,
+func NewS3VirtualFile(path string, flag int, session *session.Session, client *s3.S3) (*S3VirtualFile, error) {
+	f := &S3VirtualFile{
+		flag:      flag,
+		s3Path:    path,
 		s3Session: session,
-		s3Service: service,
+		s3Client:  client,
 	}
 
 	f.readPipe, f.writePipe = io.Pipe()
-
 	f.uploadErr = make(chan error)
 
-	return f, nil
-}
-
-func (f *S3VirtualFile) Close() error {
-
-	if f.s3FileIsRead {
-		f.s3FileOutput.Body.Close()
-	}
-
-	if f.s3FileOpen {
-		f.writePipe.Close()
-
-		// waiting on this channel means we wait for the goroutine to finish uploading and check for error
-		if err := <-f.uploadErr; err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (f *S3VirtualFile) Read(buffer []byte) (int, error) {
-	// Reading using s3.GetObject instead of s3manager.Downloader.  We could use WriteAtBuffer to buffer internally
-	// but this approach avoids buffering of data on this ftp server.
+	// Set up the read/write objects at the start.  We get better ftp client errors if we can fail before reading or writing.
 	var err error
-	if !f.s3FileIsRead {
+	if flag == os.O_RDONLY {
+		// read only doesn't need to modify the file
 		params := &s3.GetObjectInput{
 			Bucket: &S3_BUCKET_NAME,
 			Key:    &f.s3Path,
 		}
 
-		if f.s3FileOutput, err = f.s3Service.GetObject(params); err != nil {
-			return 0, err
+		if f.s3FileOutput, err = f.s3Client.GetObject(params); err != nil {
+			return nil, err
 		}
 
-		f.s3FileIsRead = true
-	}
+		f.s3ReaderOpen = true
 
-	return f.s3FileOutput.Body.Read(buffer)
-
-}
-
-func (f *S3VirtualFile) Seek(n int64, w int) (int64, error) {
-	return 0, errors.New("Unable to seek in an S3 object")
-}
-
-func (f *S3VirtualFile) Write(buffer []byte) (int, error) {
-	// Using reader and writer pipes to avoid buffering a file in memory.  Using a goroutine to do the S3 upload so
-	// we can write to the pipe while the S3 call reads from it.
-	if !f.s3FileOpen {
-		f.s3FileOpen = true
-
+	} else {
+		// everything else can create or modify a file
 		// using a go routine to avoid deadlock waiting on Write
+		f.s3WriterOpen = true
+
 		go func() {
 
 			defer f.readPipe.Close()
@@ -105,6 +74,36 @@ func (f *S3VirtualFile) Write(buffer []byte) (int, error) {
 		}()
 	}
 
+	return f, nil
+}
+
+func (f *S3VirtualFile) Close() error {
+
+	if f.s3ReaderOpen {
+		f.s3FileOutput.Body.Close()
+	}
+
+	if f.s3WriterOpen {
+		f.writePipe.Close()
+
+		// waiting on this channel means we wait for the goroutine to finish uploading and check for error
+		if err := <-f.uploadErr; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (f *S3VirtualFile) Read(buffer []byte) (int, error) {
+	return f.s3FileOutput.Body.Read(buffer)
+}
+
+func (f *S3VirtualFile) Seek(n int64, w int) (int64, error) {
+	return 0, errors.New("Unable to seek in an S3 object")
+}
+
+func (f *S3VirtualFile) Write(buffer []byte) (int, error) {
 	return f.writePipe.Write(buffer)
 }
 

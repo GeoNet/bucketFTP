@@ -16,7 +16,8 @@ This will likely change in the future.  One option would be to use the S3
 credentials for the username/password, but we didn't want these accidentally 
 transmitted over the internet in plain text.
 
-TLS is not currently implemented but is supported by the upstream ftp server.
+TLS is not currently implemented but is supported by the upstream ftp server
+package.
 
 File modes on S3 are faked.  Attempting to read or modify a file on S3 with
 insufficient permissions will raise an error.
@@ -44,18 +45,40 @@ put/get/cd/mkdir/rename/del files and directories on S3.
 ## Building and running from Docker
 
 * Install and test Docker on your system.
-* build the docker container using the script (on systems supporting bash): `./build.sh`.  This
+* Build the docker container using the script (on systems supporting bash): `./build.sh`.  This
 builds in the Alpine Go container and creates a new scratch based container containing the FTP 
 server executable and ssl certs required by the AWS SDK.
-* it should report something similar to "Successfully built b5245065b234"
-* run the container with the command `docker run -p21:21 --env-file env.list -it b5245065b234` 
-(or `docker run --network=host --env-file env.list -it b5245065b234` for running the tests), 
-using the name of the container you just built as the last argument.  This will run the server
-in a terminal with stderr/stdout being printed to the screen.
+* It should report something similar to "Successfully built b5245065b234".  It tags the build as
+bucketftp:latest.
+* Run the container with the command `docker run -p21:21 --env-file env.list -it bucketftp:latest`. 
+This will run the server in a terminal with stderr/stdout being printed to the screen.
 * The only exposed port is port 21 (the default FTP port).  All connections must be in passive mode.
 * This container can be pushed to any docker repo or run from Amazon's container service or any
 other cloud service that runs docker containers.  Managing config as environment variables keeps 
 this docker friendly.
+
+## Running the tests
+
+High level integration style tests have been added.  These tests are run while the FTP server is
+running on the local machine (localhost).  They upload, download and modify test files on an S3 
+bucket.
+
+### Testing with Docker
+
+* Build the docker container as mentioned above
+* Run the bucketFTP server in host networking mode with the command 
+`docker run --network host --env-file env.list -it bucketftp:latest`.  Docker's default bridge networking 
+mode causes a conflict with the test FTP client when both are running on localhost.  Host networking mode
+avoids this.
+* Run the tests outside of the docker container with the command `go test`, it will connect to the bucketFTP
+server on localhost:FTP_PORT.
+
+### Testing without Docker
+
+* Export the variables in env.list.  Both the server and tests need to have the 
+environment variables in env.list set correctly and exported.
+* Build and run the FTP server as mentioned above, eg `go build && ./bucketFTP`.
+* Run the tests in a separate terminal with the command `go test`.
 
 ## Important Notes
 
@@ -67,8 +90,8 @@ implemented: get, put, delete, ls, cd, rename, mkdir.
 * All dependencies are vendored using govendor.  Recent versions of Go
 should automatically use these packages making it easy to build.
 * Globbing of files (eg: *.jpg) is not supported.
-* Symbolic links are unsupported.
+* Symbolic links are not supported.
 * AWS limits the number of objects returned in certain operations such as 
 ListObjectsV2.  The limit is currently hardcoded to 10000.  This will cause
 problems if you exceed this limit.
-* This project is currently experimental.
+* This project is currently experimental but coming along quickly.

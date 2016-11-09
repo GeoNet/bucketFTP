@@ -17,7 +17,7 @@ import (
 
 type S3Driver struct {
 	s3Session *session.Session
-	s3Service *s3.S3
+	s3Client  *s3.S3
 	maxKeys   int64
 }
 
@@ -55,6 +55,12 @@ func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) er
 	// Query S3 to see if the directory exists.  We return an error if we cannot list it.
 
 	var err error
+
+	// root dir is special case, always exists in a bucket
+	if directory == "/" {
+		return nil
+	}
+
 	var prefix string
 	if prefix, err = getS3Key(directory + "/"); err != nil {
 		return err
@@ -68,7 +74,7 @@ func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) er
 	}
 
 	var resp *s3.ListObjectsV2Output
-	if resp, err = d.s3Service.ListObjectsV2(params); err != nil {
+	if resp, err = d.s3Client.ListObjectsV2(params); err != nil {
 		return err
 	}
 
@@ -92,13 +98,26 @@ func (d *S3Driver) MakeDirectory(cc server.ClientContext, directory string) erro
 		return err
 	}
 
+	if dirname == "" {
+		return fmt.Errorf("Cannot mkdir on: %s", directory)
+	}
+
+	var parentExists bool
+	if parentExists, err = d.parentExists(dirname + "../"); err != nil {
+		return err
+	}
+
+	if !parentExists {
+		return fmt.Errorf("Directory has non-existent parent directory: %s", directory)
+	}
+
 	params := &s3.PutObjectInput{
 		Bucket: &S3_BUCKET_NAME,
 		Key:    &dirname,
 		Body:   bytes.NewReader([]byte("")),
 	}
 
-	if _, err = d.s3Service.PutObject(params); err != nil {
+	if _, err = d.s3Client.PutObject(params); err != nil {
 		return err
 	}
 
@@ -127,7 +146,7 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 	}
 
 	var resp *s3.ListObjectsV2Output
-	if resp, err = d.s3Service.ListObjectsV2(params); err != nil {
+	if resp, err = d.s3Client.ListObjectsV2(params); err != nil {
 		return nil, err
 	}
 
@@ -163,15 +182,28 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 }
 
 func (d *S3Driver) UserLeft(cc server.ClientContext) {
-
 }
 
 func (d *S3Driver) OpenFile(cc server.ClientContext, path string, flag int) (server.FileStream, error) {
 	// our implementation uses an interface that mimics a file but uploads/downloads to S3
 	var err error
 	var s3file *S3VirtualFile
+	var s3key string
+	var parentExists bool
 
-	if s3file, err = NewS3VirtualFile(path, d.s3Session, d.s3Service); err != nil {
+	if parentExists, err = d.parentExists(path); err != nil {
+		return nil, err
+	}
+
+	if !parentExists {
+		return nil, fmt.Errorf("Path has non-existent parent directory: %s", path)
+	}
+
+	if s3key, err = getS3Key(path); err != nil {
+		return nil, err
+	}
+
+	if s3file, err = NewS3VirtualFile(s3key, flag, d.s3Session, d.s3Client); err != nil {
 		return nil, err
 	}
 
@@ -184,7 +216,7 @@ func (d *S3Driver) getObjectInfo(key string) (*s3.GetObjectOutput, error) {
 		Key:    &key,
 	}
 
-	req, resp := d.s3Service.GetObjectRequest(params)
+	req, resp := d.s3Client.GetObjectRequest(params)
 
 	if err := req.Send(); err != nil {
 		return nil, err
@@ -275,7 +307,7 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 	}
 
 	var resp *s3.ListObjectsV2Output
-	if resp, err = d.s3Service.ListObjectsV2(listParams); err != nil {
+	if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
 		return err
 	}
 
@@ -289,7 +321,7 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 		Delete: &s3.Delete{Objects: delObjects},
 	}
 
-	if _, err = d.s3Service.DeleteObjects(delParams); err != nil {
+	if _, err = d.s3Client.DeleteObjects(delParams); err != nil {
 		return err
 	}
 
@@ -305,17 +337,17 @@ func (d *S3Driver) isS3Dir(path string) (bool, error) {
 		return false, err
 	}
 
-	_, err = d.getObjectInfo(s3Path)
-	if err == nil {
-		return false, nil
-	}
-
 	_, err = d.getObjectInfo(s3Path + "/")
 	if err == nil {
 		return true, nil
 	}
 
-	return false, errors.New("No such file or directory")
+	_, err = d.getObjectInfo(s3Path)
+	if err == nil {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("No such file or directory: %s", path)
 }
 
 func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
@@ -333,18 +365,36 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 		return err
 	}
 
+	// sanity checks
+	if relFrom == "" || relTo == "" {
+		return errors.New("Cannot rename to or from the root directory")
+	}
+
 	var isDir bool
 	if isDir, err = d.isS3Dir(relFrom); err != nil {
 		return err
 	}
 
 	if isDir {
+
+		// if source is a dir then so is dest
 		if !strings.HasSuffix(relFrom, "/") {
 			relFrom += "/"
 		}
+
 		if !strings.HasSuffix(relTo, "/") {
 			relTo += "/"
 		}
+	}
+
+	// check for missing parent directories in destination
+	var parentDir string
+	if parentDir, err = getS3Key(filepath.Dir(to)); err != nil {
+		return err
+	}
+
+	if _, err = d.getObjectInfo(parentDir + "/"); err != nil && len(parentDir) > 0 {
+		return fmt.Errorf("Parent directory of destination does not exist: %s. err: %s", parentDir, err)
 	}
 
 	listParams := &s3.ListObjectsV2Input{
@@ -354,7 +404,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	}
 
 	var resp *s3.ListObjectsV2Output
-	if resp, err = d.s3Service.ListObjectsV2(listParams); err != nil {
+	if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
 		return err
 	}
 
@@ -374,7 +424,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 			CopySource: &copySrc,
 		}
 
-		if _, err = d.s3Service.CopyObject(copyParams); err != nil {
+		if _, err = d.s3Client.CopyObject(copyParams); err != nil {
 			return err
 		}
 	}
@@ -385,7 +435,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 		Delete: &s3.Delete{Objects: srcObjects},
 	}
 
-	if _, err = d.s3Service.DeleteObjects(delParams); err != nil {
+	if _, err = d.s3Client.DeleteObjects(delParams); err != nil {
 		return err
 	}
 
@@ -422,11 +472,33 @@ func (d *S3Driver) getFakeFileInfo(name string, size int64, modTime time.Time) (
 	return f, nil
 }
 
-func NewS3Driver(s3Session *session.Session, s3Service *s3.S3) (*S3Driver, error) {
+// check that any parent directories (S3 keys) exist in path.  S3 misbehaves when a child has missing parent directories.
+func (d *S3Driver) parentExists(path string) (bool, error) {
+	var err error
+	var dir string
+
+	if dir, err = getS3Key(filepath.Dir(path)); err != nil {
+		return false, err
+	}
+
+	if len(dir) > 0 && dir != "." && dir != "/" {
+		var isDir bool
+		// ignore errors (eg: no directory)
+		if isDir, _ = d.isS3Dir(dir); err != nil {
+			return false, nil
+		}
+
+		return isDir, nil
+	}
+
+	return true, nil
+}
+
+func NewS3Driver(s3Session *session.Session, s3Client *s3.S3) (*S3Driver, error) {
 
 	driver := &S3Driver{
 		maxKeys:   10000,
-		s3Service: s3Service,
+		s3Client:  s3Client,
 		s3Session: s3Session,
 	}
 
