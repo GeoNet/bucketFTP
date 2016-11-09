@@ -6,17 +6,20 @@ services:
   - docker
 
 before_install:
-  - script: ./build.sh
+  - ./build.sh
   # network=host bypasses a networking conflict when running the FTP server in docker and test FTP client on localhost
-  - script: docker run --network host \
-      -e "FTP_PORT=$FTP_PORT" \
-      -e "AWS_REGION=$AWS_REGION" \
-      -e "S3_BUCKET_NAME=$S3_BUCKET_NAME" \
-      -e "FTP_USER=$FTP_USER" \
-      -e "FTP_PASSWD=$FTP_PASSWD" \
-      -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
-      -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
+  - docker run --network host
+      -e "FTP_PORT=$FTP_PORT"
+      -e "AWS_REGION=$AWS_REGION"
+      -e "S3_BUCKET_NAME=$S3_BUCKET_NAME"
+      -e "FTP_USER=$FTP_USER"
+      -e "FTP_PASSWD=$FTP_PASSWD"
+      -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+      -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
       -d -t bucketftp:latest
+
+# disable go get since we're using govendor
+install: true
 
 script: go test -v ./...
 
