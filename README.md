@@ -1,4 +1,4 @@
-# Overview
+# BucketFTP Overview
 
 This is a Go implementation of an FTP server which uses Amazon S3 for storage
 of files.  It's easy to build and supports basic FTP commands such as get, put, 
