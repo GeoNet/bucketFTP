@@ -295,7 +295,7 @@ func TestRename(t *testing.T) {
 					t.Errorf("Strings do not match, expected: [%s] but saw [%s]", testString, string(dataRead))
 				}
 
-				//// TODO: the ftp client doesn't observe the error.  Should fix this.
+				//// TODO: the ftp client doesn't observe the error.  Should fix this.  Manual tests show the file is deleted.
 				//if _, err = c.Retr(tc.oldPath); err == nil {
 				//	t.Errorf("file should not exist: %s", tc.oldPath)
 				//}

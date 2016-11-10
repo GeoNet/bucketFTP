@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/fclairamb/ftpserver/server"
@@ -75,7 +76,7 @@ func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) er
 
 	var resp *s3.ListObjectsV2Output
 	if resp, err = d.s3Client.ListObjectsV2(params); err != nil {
-		return err
+		return stripNewlines(err)
 	}
 
 	// prefix of "" is a special case, the root directory of a bucket which can have zero objects
@@ -118,7 +119,21 @@ func (d *S3Driver) MakeDirectory(cc server.ClientContext, directory string) erro
 	}
 
 	if _, err = d.s3Client.PutObject(params); err != nil {
-		return err
+		return stripNewlines(err)
+	}
+
+	return nil
+}
+
+// AWS errors may include newlines that interfere with FTP commands so strip them out
+func stripNewlines(err error) error {
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			strippedMessage := strings.Replace(awsErr.Message(), "\n", "", -1)
+			return awserr.New(awsErr.Code(), strippedMessage, awsErr.OrigErr())
+		} else {
+			return err
+		}
 	}
 
 	return nil
@@ -147,7 +162,7 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
 	var resp *s3.ListObjectsV2Output
 	if resp, err = d.s3Client.ListObjectsV2(params); err != nil {
-		return nil, err
+		return nil, stripNewlines(err)
 	}
 
 	files := []os.FileInfo{}
@@ -219,7 +234,7 @@ func (d *S3Driver) getObjectInfo(key string) (*s3.GetObjectOutput, error) {
 	req, resp := d.s3Client.GetObjectRequest(params)
 
 	if err := req.Send(); err != nil {
-		return nil, err
+		return nil, stripNewlines(err)
 	}
 
 	return resp, nil
@@ -308,7 +323,7 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 
 	var resp *s3.ListObjectsV2Output
 	if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
-		return err
+		return stripNewlines(err)
 	}
 
 	var delObjects []*s3.ObjectIdentifier
@@ -322,7 +337,7 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 	}
 
 	if _, err = d.s3Client.DeleteObjects(delParams); err != nil {
-		return err
+		return stripNewlines(err)
 	}
 
 	return nil
@@ -405,7 +420,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 
 	var resp *s3.ListObjectsV2Output
 	if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
-		return err
+		return stripNewlines(err)
 	}
 
 	var srcObjects []*s3.ObjectIdentifier
@@ -425,7 +440,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 		}
 
 		if _, err = d.s3Client.CopyObject(copyParams); err != nil {
-			return err
+			return stripNewlines(err)
 		}
 	}
 
@@ -436,7 +451,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	}
 
 	if _, err = d.s3Client.DeleteObjects(delParams); err != nil {
-		return err
+		return stripNewlines(err)
 	}
 
 	return nil

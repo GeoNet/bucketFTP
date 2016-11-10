@@ -47,12 +47,23 @@ func NewS3VirtualFile(path string, flag int, session *session.Session, client *s
 		}
 
 		if f.s3FileOutput, err = f.s3Client.GetObject(params); err != nil {
-			return nil, err
+			return nil, stripNewlines(err)
 		}
 
 		f.s3ReaderOpen = true
 
 	} else {
+
+		// use PutObject to create an empty object.  This will report any errors before we write
+		params := &s3.PutObjectInput{
+			Bucket: &S3_BUCKET_NAME,
+			Key:    &f.s3Path,
+		}
+
+		if _, err = f.s3Client.PutObject(params); err != nil {
+			return nil, stripNewlines(err)
+		}
+
 		// everything else can create or modify a file
 		// using a go routine to avoid deadlock waiting on Write
 		f.s3WriterOpen = true
@@ -70,7 +81,8 @@ func NewS3VirtualFile(path string, flag int, session *session.Session, client *s
 			}
 
 			_, err := uploader.Upload(upParams)
-			f.uploadErr <- err
+			f.uploadErr <- stripNewlines(err)
+
 		}()
 	}
 
@@ -96,6 +108,10 @@ func (f *S3VirtualFile) Close() error {
 }
 
 func (f *S3VirtualFile) Read(buffer []byte) (int, error) {
+	if !f.s3ReaderOpen {
+		return 0, errors.New("Unable to read from pipe")
+	}
+
 	return f.s3FileOutput.Body.Read(buffer)
 }
 
@@ -104,6 +120,11 @@ func (f *S3VirtualFile) Seek(n int64, w int) (int64, error) {
 }
 
 func (f *S3VirtualFile) Write(buffer []byte) (int, error) {
+
+	if !f.s3WriterOpen {
+		return 0, errors.New("Unable to write to pipe")
+	}
+
 	return f.writePipe.Write(buffer)
 }
 
