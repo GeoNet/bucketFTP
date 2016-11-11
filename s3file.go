@@ -60,11 +60,10 @@ func NewS3VirtualFile(path string, flag int, session *session.Session, client *s
 			Key:    &f.s3Path,
 		}
 
-		if _, err = f.s3Client.PutObject(params); err != nil {
+		if _, err := f.s3Client.PutObject(params); err != nil {
 			return nil, stripNewlines(err)
 		}
 
-		// everything else can create or modify a file
 		// using a go routine to avoid deadlock waiting on Write
 		f.s3WriterOpen = true
 

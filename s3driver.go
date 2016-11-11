@@ -331,6 +331,10 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 		delObjects = append(delObjects, &s3.ObjectIdentifier{Key: f.Key})
 	}
 
+	if len(delObjects) == 0 {
+		return fmt.Errorf("No such file or directory: %s [S3 key: %s]", path, relPath)
+	}
+
 	delParams := &s3.DeleteObjectsInput{
 		Bucket: &S3_BUCKET_NAME,
 		Delete: &s3.Delete{Objects: delObjects},
@@ -448,6 +452,10 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	delParams := &s3.DeleteObjectsInput{
 		Bucket: &S3_BUCKET_NAME,
 		Delete: &s3.Delete{Objects: srcObjects},
+	}
+
+	if len(srcObjects) == 0 {
+		return fmt.Errorf("Unable to remove old file: %s [S3 key: %s]", from, relFrom)
 	}
 
 	if _, err = d.s3Client.DeleteObjects(delParams); err != nil {
