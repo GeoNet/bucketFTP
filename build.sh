@@ -7,7 +7,7 @@
 # usage: ./build.sh
 
 # code will be compiled in this container
-BUILD_CONTAINER=golang:1.7.0-alpine
+BUILD_CONTAINER=golang:1.7.3-alpine
 
 DOCKER_TMP="docker-build-tmp"
 VERSION='git-'`git rev-parse --short HEAD`

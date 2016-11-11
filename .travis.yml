@@ -6,30 +6,21 @@ services:
   - docker
 
 before_install:
+  # checking that build.sh works but testing bucketftp in a different container
   - bash -x build.sh
-  # network=host bypasses a networking conflict when running the FTP server in docker and test FTP client on localhost
-  - docker run --network host
-      -e "FTP_PORT=$FTP_PORT"
-      -e "AWS_REGION=$AWS_REGION"
-      -e "S3_BUCKET_NAME=$S3_BUCKET_NAME"
-      -e "FTP_USER=$FTP_USER"
-      -e "FTP_PASSWD=$FTP_PASSWD"
-      -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
-      -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
-      -d -t bucketftp:latest
+  - docker build -f Dockerfile.testing -t bucketftp:testing .
 
-# disable go get since we're using govendor
 install: true
 
-script: go test -v ./...
-
-#notifications:
-#  hipchat:
-#    rooms:
-#      secure: ""
-#    notify: true
-#    on_success: always
-#    on_failure: always
+script: docker run 
+  -e "FTP_PORT=$FTP_PORT"
+  -e "AWS_REGION=$AWS_REGION"
+  -e "S3_BUCKET_NAME=$S3_BUCKET_NAME"
+  -e "FTP_USER=$FTP_USER"
+  -e "FTP_PASSWD=$FTP_PASSWD"
+  -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+  -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+  -t bucketftp:testing
 
 #deploy:
 #   - provider: script

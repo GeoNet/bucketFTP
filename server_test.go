@@ -4,12 +4,29 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/jlaffaye/ftp"
+	"gopkg.in/inconshreveable/log15.v2"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 )
+
+var U string
+
+func init() {
+	// disable logging in log15 (used by the ftp server)
+	logger := log15.Root()
+	logger.SetHandler(log15.DiscardHandler())
+
+	// unique random number when creating all keys so tests can run concurrently
+	U = strconv.Itoa(rand.Intn(10000000))
+
+	// run the main bucketFTP server app in a goroutine
+	go main()
+}
 
 // Integration style tests for the FTP server.  This requires the server to be running
 // on localhost and the variables in env.list to be exported (eg: FTP_PORT, etc).
@@ -90,10 +107,10 @@ func TestPutAndGet(t *testing.T) {
 		path        string
 		errExpected bool
 	}{
-		{"/testfile1.txt", false},
-		{"testfile2.txt", false},
-		{"file with spaces.txt", false},
-		{"/invalid_directory/testfile3.txt", true}, // the directory does not exist
+		{"/testfile1" + U + ".txt", false},
+		{"testfile2" + U + ".txt", false},
+		{"file with spaces" + U + ".txt", false},
+		{"/invalid_directory" + U + "/testfile3" + U + ".txt", true}, // the parent key does not exist
 	}
 
 	var err error
@@ -129,11 +146,11 @@ func TestDirs(t *testing.T) {
 		errExpected bool
 	}{
 		{"/", "/", true}, // shouldn't be able to mkdir /
-		{"testdir1", "/testdir1", false},
-		{"/testdir2", "/testdir2", false},
-		{"/testdir3/", "/testdir3/", false},
-		{"test dir 4", "/test dir 4", false},
-		{"testdir5/testsubdir", "", true}, // fails, testdir5 doesn't exist yet
+		{"testdir1" + U, "/testdir1" + U, false},
+		{"/testdir2" + U, "/testdir2" + U, false},
+		{"/testdir3" + U + "/", "/testdir3" + U + "/", false},
+		{"test dir 4" + U, "/test dir 4" + U, false},
+		{"testdir5" + U + "/testsubdir" + U, "", true}, // fails, parent key doesn't exist yet
 	}
 
 	var err error
@@ -169,7 +186,7 @@ func TestDirs(t *testing.T) {
 			}
 
 			// test getting and putting a file from this directory
-			testFile := "testfile"
+			testFile := "testfile" + U
 			if err = checkUploadedFile(c, testFile); err != nil {
 				t.Error(err)
 			}
@@ -208,15 +225,17 @@ func TestRename(t *testing.T) {
 	}{
 		// dirs
 		{"/", []string{}, "/", true, true}, // shouldn't be able to cp a dir to itself
-		{"testdir1", []string{}, "newtestdir1", true, false},
-		{"/testdir2", []string{}, "/newtestdir2", true, false},
-		{"/testdir3/", []string{}, "/testdir4/subdir", true, true}, // parent dir doesn't exist, should fail
+		{"testdir1" + U, []string{}, "newtestdir1" + U, true, false},
+		{"/testdir2" + U, []string{}, "/newtestdir2" + U, true, false},
+		{"/testdir3" + U + "/", []string{}, "/testdir4/subdir" + U, true, true}, // parent key doesn't exist, should fail
 		// files
-		{"newfile1", []string{}, "newfile2", false, false},
-		{"/newfile3", []string{}, "newfile4", false, false},
-		{"/newfile3", []string{}, "new file 4", false, false},
-		{"/dir with spaces/testfile1.txt", []string{"dir with spaces"}, "new dir 4/more spaces1.txt", false, true},               // parent dir does not exist
-		{"/dir with spaces/testfile2.txt", []string{"dir with spaces", "new dir 5"}, "new dir 5/more spaces2.txt", false, false}, // parent dir exists
+		{"newfile1" + U, []string{}, "newfile2" + U, false, false},
+		{"/newfile3" + U, []string{}, "newfile4" + U, false, false},
+		{"/newfile3" + U, []string{}, "new file 4" + U, false, false},
+		{"/dir with spaces" + U + "/testfile1" + U + ".txt", []string{"dir with spaces" + U},
+			"new dir 4" + U + "/more spaces1" + U + ".txt", false, true}, // parent dir does not exist
+		{"/dir with spaces" + U + "/testfile2" + U + ".txt", []string{"dir with spaces" + U, "new dir 5" + U},
+			"new dir 5" + U + "/more spaces2" + U + ".txt", false, false}, // parent dir exists
 	}
 
 	var err error
@@ -326,9 +345,9 @@ func TestDirRenameDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirA := "/dirA"
-	dirB := "/dirB"
-	newDirA := "/dirB/subdir"
+	dirA := "/dirA" + U
+	dirB := "/dirB" + U
+	newDirA := "/dirB" + U + "/subdir" + U
 	if err = c.MakeDir(dirA); err != nil {
 		t.Error(err)
 	}
@@ -341,7 +360,7 @@ func TestDirRenameDelete(t *testing.T) {
 		t.Error(err)
 	}
 
-	testFile := "testfile"
+	testFile := "testfile" + U
 	if err = checkUploadedFile(c, testFile); err != nil {
 		t.Error(err)
 	}
@@ -385,9 +404,9 @@ func TestDirRenameDelete(t *testing.T) {
 
 func TestListFiles(t *testing.T) {
 	// check the list of files (not their contents)
-	startDir := "/listfiles"
-	files := []string{"file1", "file2", "file3"}
-	dirs := []string{"subdir1", "subdir2", "subdir2/deepdir"}
+	startDir := "/listfiles" + U
+	files := []string{"file1" + U, "file2" + U, "file3" + U}
+	dirs := []string{"subdir1" + U, "subdir2" + U, "subdir2" + U + "/deepdir" + U}
 
 	var err error
 	var c *ftp.ServerConn

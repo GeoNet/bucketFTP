@@ -1,6 +1,5 @@
 FROM scratch
-ADD ./ /
-#USER nobody
+ADD bucketFTP /
 CMD ["/bucketFTP"]
 # FTP port
 EXPOSE 21
