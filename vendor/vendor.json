@@ -203,6 +203,12 @@
 			"revisionTime": "2016-09-30T08:41:57Z"
 		},
 		{
+			"checksumSHA1": "zmC8/3V4ls53DJlNTKDZwPSC/dA=",
+			"path": "github.com/satori/go.uuid",
+			"revision": "b061729afc07e77a8aa4fad0a2fd840958f1942a",
+			"revisionTime": "2016-09-27T10:08:44Z"
+		},
+		{
 			"checksumSHA1": "lxnYI7ISNsR6jZLOGRURNlUiSNs=",
 			"path": "gopkg.in/inconshreveable/log15.v2",
 			"revision": "b105bd37f74e5d9dc7b6ad7806715c7a2b83fd3f",

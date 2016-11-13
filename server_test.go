@@ -7,11 +7,10 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"os"
-	"strconv"
 	"testing"
 	"time"
+	"github.com/satori/go.uuid"
 )
 
 var U string
@@ -21,12 +20,8 @@ func init() {
 	logger := log15.Root()
 	logger.SetHandler(log15.DiscardHandler())
 
-	// unique random number when creating all keys so tests can run concurrently.
-	if os.Getenv("TRAVIS_COMMIT") != "" {
-		U = os.Getenv("TRAVIS_COMMIT")
-	} else {
-		U = strconv.Itoa(rand.Intn(10000000))
-	}
+	// Use a uuid based on MAC address (should be unique in Travis/Docker)
+	U = uuid.NewV1().String()
 
 	// run the main bucketFTP server app in a goroutine
 	go main()
