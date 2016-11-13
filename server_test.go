@@ -21,8 +21,12 @@ func init() {
 	logger := log15.Root()
 	logger.SetHandler(log15.DiscardHandler())
 
-	// unique random number when creating all keys so tests can run concurrently
-	U = strconv.Itoa(rand.Intn(10000000))
+	// unique random number when creating all keys so tests can run concurrently.
+	if os.Getenv("TRAVIS_COMMIT") != "" {
+		U = os.Getenv("TRAVIS_COMMIT")
+	} else {
+		U = strconv.Itoa(rand.Intn(10000000))
+	}
 
 	// run the main bucketFTP server app in a goroutine
 	go main()
