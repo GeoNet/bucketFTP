@@ -1,5 +1,5 @@
 FROM scratch
-ADD bucketFTP /
+COPY . /
 CMD ["/bucketFTP"]
 # FTP port
 EXPOSE 21

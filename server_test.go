@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/jlaffaye/ftp"
+	"github.com/satori/go.uuid"
 	"gopkg.in/inconshreveable/log15.v2"
 	"io"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
-	"github.com/satori/go.uuid"
 )
 
 var U string
