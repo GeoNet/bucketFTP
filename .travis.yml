@@ -6,30 +6,21 @@ services:
   - docker
 
 before_install:
-  - ./build.sh
-  # network=host bypasses a networking conflict when running the FTP server in docker and test FTP client on localhost
-  - docker run --network host
-      -e "FTP_PORT=$FTP_PORT"
-      -e "AWS_REGION=$AWS_REGION"
-      -e "S3_BUCKET_NAME=$S3_BUCKET_NAME"
-      -e "FTP_USER=$FTP_USER"
-      -e "FTP_PASSWD=$FTP_PASSWD"
-      -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
-      -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
-      -d -t bucketftp:latest
+  # checking that build.sh works but testing bucketftp in a different container
+  - bash -x build.sh
+  - docker build -f Dockerfile.testing -t bucketftp:testing .
 
-# disable go get since we're using govendor
 install: true
 
-script: go test -v ./...
-
-#notifications:
-#  hipchat:
-#    rooms:
-#      secure: ""
-#    notify: true
-#    on_success: always
-#    on_failure: always
+script: docker run 
+  -e "FTP_PORT=$FTP_PORT"
+  -e "AWS_REGION=$AWS_REGION"
+  -e "S3_BUCKET_NAME=$S3_BUCKET_NAME"
+  -e "FTP_USER=$FTP_USER"
+  -e "FTP_PASSWD=$FTP_PASSWD"
+  -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+  -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+  -t bucketftp:testing
 
 #deploy:
 #   - provider: script
@@ -40,11 +31,8 @@ script: go test -v ./...
 
 env:
     global:
+        # Environment variables FTP_PASSWD, AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are stored in Travis CIs job config
         - FTP_PORT=3000
         - AWS_REGION=ap-southeast-2
         - S3_BUCKET_NAME=bucketftp-test.geonet.org.nz
         - FTP_USER=ftpuser
-        - secure: "gXdZNmICxyVHek9LpztqCunjHA5cgy/GwXdjto1QytTWX5Day/tQQeoNbarhdya9/ASg8Cd2TkkfWuLrOIN2ZDBFZzjQ9blgAjylj1bQyZfOOY/UAEmFdnGfV861HZ/nEskcfAmKi4qMOTyo66XLFwxUoXXB2FI8ONaXP8UV5jUaBD4ctsJ1UuPEa3EzCatiQx9Ddd1eESNd8CEvdAcs4AtW61f+EUJH5t+Ubc6yx27ysGGKniKbLzpJWeCNhTzYBpJOndCAurzHJ6/6VZHrtJ+WooIC1mW+tsx1oEwv5ehVYZlLgBn8nySlp9s+H261E8Tk+MpT4uLmnkvXMRtemz9zAmgretzD8raTwfZJvOaftvprmAcgWjVxF7NINPDum0vsUbbNH+ZWCZP5YP6KHV/W8tACldAN4IipM/uvi2Hz3DHGtW1dykLj+jjeH42xPAmwCVQ8RPBLmKeVN8qKE9EzsrHsmnnk1cb+tfYYR8xERPXCjzWqIG3LGP/ONCv7vhFZyWSHtTrFS3q94KfhU9JsDFws5fqHy9fyTkrZV2YAefurlhEn4nTR6DU730XOlSdJQYyulQTr1B204WQF2mDB0HQIFBxfB+7cJckeJ2NdH2TXhrTqjui5YHvd4YHzsUIW++Nexl1J7V9lc9ULxG8GXEjn/66Y143YwyTapXc="
-        - secure: "uZoQ2Hhl6g2NTmFOMnA6cdL+jYu5XULjAIufzT8DJeiZTOoJhr7q/L1qJ3Z+gVAF9v/AqBsXxMNxFxOPwj1loDaj+3HzMHcF8yCR2GGkWLG6+aMg2aHvuAQ9p11NzQaAzZxo0JQOY62u6a5gQI1oKGVUSwPXh1O3PBH8GhFGeeRQpHSzV+Etg70QhfzVFwVZ9il0RWJrWIBbkt/G4dtqud/Pq1ZlehCajNgVrDVQTarFk7iytk5W7j8p2tIY/NdK9k0Wrtn3a58oQF4e46uh3Py5Jp4EbR93geUInJiyjgmqcPe96xIrGX9egPOhASDB8+EiUX5HnDnxvc6iys9or4WQGBahzDkh3QNs8uZsbZIYcwGzbuhZLf4mGLvmRt5hpItDcPH4T0pWol4lpZxbvT8fFOA9NWfpoFEQwHznRmrqTIFhEryhUorgoutNvQTmstZjTnjoiHfxqFulTZ5c+EnZUd6xyZZg0xwpqgL1yaCA9Cr69lH39ksfSQSg5DFP8E4mZdp7HJsa2xs6RUONl4HguhadZfH1tHO+RO+zeDXkTWfETO66EcDqRx8wqgX3fylNm2R60TA/IASEg+4sF5+WiWHDMTB2zd4n+Z1sAfWpFjzVlGaUWN3bShpm0aalLPlb2UKrdu2yclAgD/aZEvhdgnS6jsVfi3WuY1HDtro="
-        - secure: "zjHvBtJ3UHbPx8+JGRFHamx9U9MHO4CtzzbpQcMrUOTG8qnTnjJPSoEsLCaN9imP2UYpmZXda948jx0LSWQAh19NjuSe9fwNDsK9XisbEgYWXCT6Hfx+cQFAFTwnVNqD5fKUYQSZmDtYzVOi/6fW/s9NcTj3gj6QIXaOYAT6/bU0lCrSZvP+LDOZ1Zn/cIbFvGVOikI/03AUEQufzm8T5rj7R8STRpf+MVwg3agZxmPgeCBpGn/7IzI3PXYn/2QZOD88IHcJ2Z5wFIewz61Ymu9A3/G8aXpDhUzPND4Zt0CGuFQS+MpiXs5LxXOFUOBeqawx/sIym+0Vctco91CYAXFoXP2rEQRe1rA7umKB7qaVwoadR++jLFnFobELAx+KVWmIxSnx0QUUPvA+RAmEfOmgAufLHOh9blLmGNTrwMgGITWAwaTGLWvR1uRdlHgDdD211N50uLrtmQwIQxkQJaX4VDgOD12UiXfZmqMesoWk4rlkph6OAXn0Fn8DFLlNQyxA4skaj3lYSfomnwh7o0vKWQSGOFC7jorekYEv9G44ms5lFVbM0zaaTtrV0lIJhCbo5Nv7ZINqqQC69OUsZmZq9jbF92SfcziEOYCQ0/pXaS/x+WUfChpEypC/EJDrp3jG6xSIqC6jEEJlVN3mvRVlPNgzNkLU2HG4SMM83ks="
-

@@ -1,0 +1,4 @@
+FROM golang:1.7.3-alpine
+RUN apk add --update ca-certificates tzdata
+COPY ./ src/github.com/GeoNet/bucketFTP/
+CMD ["go", "test", "-v", "./..."]

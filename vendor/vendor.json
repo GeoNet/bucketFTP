@@ -165,10 +165,10 @@
 			"revisionTime": "2016-10-05T19:30:57Z"
 		},
 		{
-			"checksumSHA1": "qhvnyvWxRLWo4I/e/Z3j/XYKA4Y=",
+			"checksumSHA1": "LqW5FHiq2Wj8Yg89z/nF4gA/vRw=",
 			"path": "github.com/fclairamb/ftpserver/server",
-			"revision": "c0bcec96d4d70dbafb0ea522f2b0ca6f347c5576",
-			"revisionTime": "2016-10-30T00:17:24Z"
+			"revision": "81538261be854dd3d39aeeee122959f69032feac",
+			"revisionTime": "2016-11-02T10:39:17Z"
 		},
 		{
 			"checksumSHA1": "FCeEm2BWZV/n4oTy+SGd/k0Ab5c=",
@@ -201,6 +201,12 @@
 			"path": "github.com/mattn/go-colorable",
 			"revision": "6c903ff4aa50920ca86087a280590b36b3152b9c",
 			"revisionTime": "2016-09-30T08:41:57Z"
+		},
+		{
+			"checksumSHA1": "zmC8/3V4ls53DJlNTKDZwPSC/dA=",
+			"path": "github.com/satori/go.uuid",
+			"revision": "b061729afc07e77a8aa4fad0a2fd840958f1942a",
+			"revisionTime": "2016-09-27T10:08:44Z"
 		},
 		{
 			"checksumSHA1": "lxnYI7ISNsR6jZLOGRURNlUiSNs=",
