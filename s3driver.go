@@ -517,15 +517,21 @@ func (d *S3Driver) parentExists(path string) (bool, error) {
 	return true, nil
 }
 
-func NewS3Driver(s3Session *session.Session, s3Client *s3.S3) (*S3Driver, error) {
+func NewS3Driver(s3Session *session.Session) *S3Driver {
+
+	var client *s3.S3
+
+	if s3Session != nil {
+		client = s3.New(s3Session)
+	}
 
 	driver := &S3Driver{
 		maxKeys:   10000,
-		s3Client:  s3Client,
+		s3Client:  client,
 		s3Session: s3Session,
 	}
 
-	return driver, nil
+	return driver
 }
 
 // cleans the input path and queries S3 to see if it's a directory or file key.  Will return an error if it cannot find

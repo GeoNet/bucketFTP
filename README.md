@@ -74,9 +74,9 @@ on an S3 bucket.
 
 * Checkout this git repo and cd to it's top level directory.
 * Build the testing Docker container with the command 
-`docker build -f Dockerfile.testing -t bucketftp:testing .`
+`docker build -f Dockerfile.testing -t bucketftp_testing .`
 * Run the container with the command 
-`docker run --env-file env_travis.list -t bucketftp:testing`
+`docker run --env-file env_travis.list -t bucketftp_testing`
 * The Docker container runs the FTP server and tests in a single Alpine 
 Linux container with verbose output.
 

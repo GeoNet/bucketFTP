@@ -25,10 +25,13 @@ func init() {
 
 	// run the main bucketFTP server app in a goroutine
 	go main()
+
+	// allow time for the server to start
+	time.Sleep(time.Millisecond * 50)
 }
 
-// Integration style tests for the FTP server.  This requires the server to be running
-// on localhost and the variables in env.list to be exported (eg: FTP_PORT, etc).
+// Integration style tests for the FTP server.  This requires variables in
+// env.list to be exported (eg: FTP_PORT, etc).
 
 func getClient(doLogin bool) (*ftp.ServerConn, error) {
 	c, err := ftp.DialTimeout("localhost:"+os.Getenv("FTP_PORT"), time.Second)

@@ -29,11 +29,7 @@ func TestAuthUser(t *testing.T) {
 	var err error
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("%s, %s, %t", tc.user, tc.passwd, tc.errExpected), func(t *testing.T) {
-			var d *S3Driver
-			if d, err = NewS3Driver(nil, nil); err != nil {
-				t.Error(err)
-			}
-
+			d := &S3Driver{}
 			if _, err = d.AuthUser(nil, tc.user, tc.passwd); (err != nil) != tc.errExpected {
 				t.Error("Expected username/passwd to fail")
 			}

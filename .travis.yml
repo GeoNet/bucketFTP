@@ -8,7 +8,7 @@ services:
 before_install:
   # checking that build.sh works but testing bucketftp in a different container
   - bash -x build.sh
-  - docker build -f Dockerfile.testing -t bucketftp:testing .
+  - docker build -f Dockerfile.testing -t bucketftp_testing .
 
 install: true
 
@@ -20,7 +20,7 @@ script: docker run
   -e "FTP_PASSWD=$FTP_PASSWD"
   -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
   -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
-  -t bucketftp:testing
+  -t bucketftp_testing
 
 #deploy:
 #   - provider: script

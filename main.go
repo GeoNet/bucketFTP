@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/fclairamb/ftpserver/server"
 	"log"
 	"os"
@@ -13,6 +12,7 @@ import (
 
 var (
 	ftpServer      *server.FtpServer
+	driver         *S3Driver
 	FTP_PORT_STR   = os.Getenv("FTP_PORT")
 	FTP_PORT       int
 	S3_BUCKET_NAME = os.Getenv("S3_BUCKET_NAME")
@@ -46,13 +46,7 @@ func main() {
 		log.Fatal("error creating S3 session", err)
 	}
 
-	s3Service := s3.New(s3Session)
-
-	var driver *S3Driver
-	if driver, err = NewS3Driver(s3Session, s3Service); err != nil {
-		log.Fatal("error creating S3 FTP driver", err)
-	}
-
+	driver = NewS3Driver(s3Session)
 	ftpServer = server.NewFtpServer(driver)
 
 	go signalHandler()
