@@ -16,6 +16,7 @@ var (
 	FTP_PORT_STR   = os.Getenv("FTP_PORT")
 	FTP_PORT       int
 	S3_BUCKET_NAME = os.Getenv("S3_BUCKET_NAME")
+	ROOT_PREFIX    = os.Getenv("ROOT_PREFIX")
 	FTP_USER       = os.Getenv("FTP_USER")
 	FTP_PASSWD     = os.Getenv("FTP_PASSWD")
 )
@@ -46,7 +47,7 @@ func main() {
 		log.Fatal("error creating S3 session", err)
 	}
 
-	driver = NewS3Driver(s3Session)
+	driver = NewS3Driver(s3Session, S3_BUCKET_NAME, ROOT_PREFIX, FTP_PORT, FTP_USER, FTP_PASSWD)
 	ftpServer = server.NewFtpServer(driver)
 
 	go signalHandler()

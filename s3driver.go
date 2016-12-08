@@ -17,9 +17,14 @@ import (
 )
 
 type S3Driver struct {
-	s3Session *session.Session
-	s3Client  *s3.S3
-	maxKeys   int64
+	s3Session    *session.Session
+	s3Client     *s3.S3
+	s3BucketName string
+	rootPrefix   string
+	ftpPort      int
+	ftpUser      string
+	ftpPasswd    string
+	maxKeys      int64
 }
 
 func (d *S3Driver) WelcomeUser(cc server.ClientContext) (string, error) {
@@ -29,12 +34,12 @@ func (d *S3Driver) WelcomeUser(cc server.ClientContext) (string, error) {
 
 func (d *S3Driver) AuthUser(cc server.ClientContext, user, pass string) (server.ClientHandlingDriver, error) {
 
-	if user != FTP_USER {
+	if user != d.ftpUser {
 		log.Println("username does not match expected user", user)
 		return nil, fmt.Errorf("incorrect username: %s", user)
 	}
 
-	if pass != FTP_PASSWD {
+	if pass != d.ftpPasswd {
 		log.Println("incorrect password")
 		return nil, errors.New("incorrect password")
 	}
@@ -63,7 +68,7 @@ func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) er
 	}
 
 	var prefix string
-	if prefix, err = getS3Key(directory + "/"); err != nil {
+	if prefix, err = d.getS3Key(directory + "/"); err != nil {
 		return err
 	}
 
@@ -94,27 +99,32 @@ func (d *S3Driver) ChangeDirectory(cc server.ClientContext, directory string) er
 func (d *S3Driver) MakeDirectory(cc server.ClientContext, directory string) error {
 
 	var err error
-	var dirname string
-	if dirname, err = getS3Key(directory + "/"); err != nil {
+	var s3Key string
+	if s3Key, err = d.getS3Key(directory + "/"); err != nil {
 		return err
 	}
 
-	if dirname == "" {
+	if directory == "" || directory == "/" || s3Key == "" {
 		return fmt.Errorf("Cannot mkdir on: %s", directory)
 	}
 
+	var parentKey string
+	if parentKey, err = d.getS3Key(filepath.Join(directory, "../") + "/"); err != nil {
+		return err
+	}
+
 	var parentExists bool
-	if parentExists, err = d.parentExists(dirname + "../"); err != nil {
+	if parentExists, err = d.isS3Dir(parentKey); err != nil {
 		return err
 	}
 
 	if !parentExists {
-		return fmt.Errorf("Directory has non-existent parent directory: %s", directory)
+		return fmt.Errorf("Directory '%s' has non-existent parent directory: %s", directory, parentKey)
 	}
 
 	params := &s3.PutObjectInput{
 		Bucket: &S3_BUCKET_NAME,
-		Key:    &dirname,
+		Key:    &s3Key,
 		Body:   bytes.NewReader([]byte("")),
 	}
 
@@ -143,7 +153,7 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
 	var err error
 	var prefix string
-	if prefix, err = getS3Key(cc.Path()); err != nil {
+	if prefix, err = d.getS3Key(cc.Path()); err != nil {
 		return nil, err
 	}
 
@@ -169,9 +179,10 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
 	// directories other than CWD
 	for _, dir := range resp.CommonPrefixes {
-		var dirInfo os.FileInfo
+		relKey := strings.Replace(*dir.Prefix, d.rootPrefix, "", 1)
 
-		if dirInfo, err = d.GetFileInfo(cc, filepath.Join("/", *dir.Prefix)+"/"); err != nil {
+		var dirInfo os.FileInfo
+		if dirInfo, err = d.GetFileInfo(cc, relKey); err != nil {
 			return nil, err
 		}
 
@@ -186,8 +197,10 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 			continue
 		}
 
+		relKey := strings.Replace(*f.Key, d.rootPrefix, "", 1)
+
 		var fi os.FileInfo
-		if fi, err = d.getFakeFileInfo(*f.Key, *f.Size, *f.LastModified); err != nil {
+		if fi, err = d.getFakeFileInfo(relKey, *f.Size, *f.LastModified); err != nil {
 			return nil, err
 		}
 		files = append(files, fi)
@@ -206,16 +219,16 @@ func (d *S3Driver) OpenFile(cc server.ClientContext, path string, flag int) (ser
 	var s3key string
 	var parentExists bool
 
-	if parentExists, err = d.parentExists(path); err != nil {
+	if s3key, err = d.getS3Key(path); err != nil {
+		return nil, err
+	}
+
+	if parentExists, err = d.parentExists(s3key); err != nil {
 		return nil, err
 	}
 
 	if !parentExists {
 		return nil, fmt.Errorf("Path has non-existent parent directory: %s", path)
-	}
-
-	if s3key, err = getS3Key(path); err != nil {
-		return nil, err
 	}
 
 	if s3file, err = NewS3VirtualFile(s3key, flag, d.s3Session, d.s3Client); err != nil {
@@ -244,7 +257,7 @@ func (d *S3Driver) GetFileInfo(cc server.ClientContext, path string) (os.FileInf
 
 	var err error
 	relPath := path
-	if relPath, err = getS3Key(path); err != nil {
+	if relPath, err = d.getS3Key(path); err != nil {
 		return nil, err
 	}
 
@@ -301,7 +314,7 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 
 	var err error
 	var relPath string
-	if relPath, err = getS3Key(path); err != nil {
+	if relPath, err = d.getS3Key(path); err != nil {
 		return err
 	}
 
@@ -349,24 +362,24 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 
 // returns true or false depending on if the path exists as a file (no trailing slash) or a directory (trailing slash)
 // in S3.
-func (d *S3Driver) isS3Dir(path string) (bool, error) {
+func (d *S3Driver) isS3Dir(s3Key string) (bool, error) {
 	var err error
-	var s3Path string
-	if s3Path, err = getS3Key(path); err != nil {
-		return false, err
-	}
 
-	_, err = d.getObjectInfo(s3Path + "/")
+	// clean strips any trailing slashes off
+	s3Key = filepath.Clean(s3Key)
+
+	// see if the key exists as a directory and fallback to checking if it's a file
+	_, err = d.getObjectInfo(s3Key + "/")
 	if err == nil {
 		return true, nil
 	}
 
-	_, err = d.getObjectInfo(s3Path)
+	_, err = d.getObjectInfo(s3Key)
 	if err == nil {
 		return false, nil
 	}
 
-	return false, fmt.Errorf("No such file or directory: %s", path)
+	return false, fmt.Errorf("No such file or directory: %s", s3Key)
 }
 
 func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
@@ -376,17 +389,21 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	var err error
 	var relFrom, relTo string
 
-	if relFrom, err = getS3Key(from); err != nil {
+	if relFrom, err = d.getS3Key(from); err != nil {
 		return err
 	}
 
-	if relTo, err = getS3Key(to); err != nil {
+	if relTo, err = d.getS3Key(to); err != nil {
 		return err
 	}
 
 	// sanity checks
 	if relFrom == "" || relTo == "" {
 		return errors.New("Cannot rename to or from the root directory")
+	}
+
+	if relFrom == relTo {
+		return errors.New("Cannot rename a directory to itself")
 	}
 
 	var isDir bool
@@ -408,7 +425,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 
 	// check for missing parent directories in destination
 	var parentDir string
-	if parentDir, err = getS3Key(filepath.Dir(to)); err != nil {
+	if parentDir, err = d.getS3Key(filepath.Dir(to)); err != nil {
 		return err
 	}
 
@@ -468,7 +485,7 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 func (d *S3Driver) GetSettings() *server.Settings {
 	config := server.Settings{
 		Host:           "0.0.0.0",
-		Port:           FTP_PORT,
+		Port:           d.ftpPort,
 		MaxConnections: 300,
 	}
 	return &config
@@ -496,13 +513,11 @@ func (d *S3Driver) getFakeFileInfo(name string, size int64, modTime time.Time) (
 }
 
 // check that any parent directories (S3 keys) exist in path.  S3 misbehaves when a child has missing parent directories.
-func (d *S3Driver) parentExists(path string) (bool, error) {
+func (d *S3Driver) parentExists(s3Key string) (bool, error) {
 	var err error
 	var dir string
 
-	if dir, err = getS3Key(filepath.Dir(path)); err != nil {
-		return false, err
-	}
+	dir = filepath.Dir(s3Key) + "/"
 
 	if len(dir) > 0 && dir != "." && dir != "/" {
 		var isDir bool
@@ -517,26 +532,9 @@ func (d *S3Driver) parentExists(path string) (bool, error) {
 	return true, nil
 }
 
-func NewS3Driver(s3Session *session.Session) *S3Driver {
-
-	var client *s3.S3
-
-	if s3Session != nil {
-		client = s3.New(s3Session)
-	}
-
-	driver := &S3Driver{
-		maxKeys:   10000,
-		s3Client:  client,
-		s3Session: s3Session,
-	}
-
-	return driver
-}
-
 // cleans the input path and queries S3 to see if it's a directory or file key.  Will return an error if it cannot find
 // either a file or directory key (with a trailing slash)
-func getS3Key(path string) (string, error) {
+func (d *S3Driver) getS3Key(path string) (string, error) {
 	var err error
 	s3Key := path
 
@@ -548,8 +546,12 @@ func getS3Key(path string) (string, error) {
 	}
 
 	// "/" relative to "/" is "." but in S3 this should be ""
-	if s3Key == "." {
+	if s3Key == "." || s3Key == "./" {
 		s3Key = ""
+	}
+
+	if d.rootPrefix != "" {
+		s3Key = d.rootPrefix + s3Key
 	}
 
 	// directories in S3 must always have a trailing slash (filepath.Rel removes this)
@@ -558,4 +560,26 @@ func getS3Key(path string) (string, error) {
 	}
 
 	return s3Key, nil
+}
+
+func NewS3Driver(s3Session *session.Session, s3BucketName, rootPrefix string, ftpPort int, ftpUser, ftpPasswd string) *S3Driver {
+
+	var client *s3.S3
+
+	if s3Session != nil {
+		client = s3.New(s3Session)
+	}
+
+	driver := &S3Driver{
+		maxKeys:      10000,
+		s3Client:     client,
+		s3Session:    s3Session,
+		s3BucketName: s3BucketName,
+		rootPrefix:   rootPrefix,
+		ftpPort:      ftpPort,
+		ftpUser:      ftpUser,
+		ftpPasswd:    ftpPasswd,
+	}
+
+	return driver
 }
