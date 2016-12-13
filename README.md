@@ -8,13 +8,13 @@ license.
 
 ## Security
 
-FTP is an insecure protocol.  We use specialised hardware that only supports 
-FTP so are forced to use it.  We strongly recommend using a private network 
-when using FTP.
+FTP is an insecure protocol.  We use specialised hardware in the field that 
+only supports FTP so are forced to use it.  We strongly recommend using a 
+private network when using FTP.
 
 User auth is extremely simple.  It's checking against environment variables
 set on the server.  This will likely change in the future.  One option would 
-be to use the S3 credentials for the username/password, but we didn't want 
+be to use the AWS credentials for the username/password, but we didn't want 
 these accidentally transmitted over the internet in plain text.
 
 TLS is not currently implemented but is supported by the upstream ftp server
@@ -68,15 +68,16 @@ Managing config as environment variables keeps this docker friendly.
 
 High level integration style tests have been added.  These tests start a
 test FTP server and client.  They upload, download and modify test files 
-on an S3 bucket.
+on an S3 bucket and therefore require valid S3 credentials (see env.list).
 
 ### Testing the easy way with Docker
 
 * Checkout this git repo and cd to it's top level directory.
 * Build the testing Docker container with the command 
-`docker build -f Dockerfile.testing -t bucketftp:testing .`
-* Run the container with the command 
-`docker run --env-file env_travis.list -t bucketftp:testing`
+`docker build -f Dockerfile.testing -t bucketftp_testing .`
+* Run the container with the command, having modified env.list with the 
+ appropriate values
+`docker run --env-file env.list -t bucketftp_testing`
 * The Docker container runs the FTP server and tests in a single Alpine 
 Linux container with verbose output.
 
@@ -88,6 +89,19 @@ environment variables in env.list set correctly and exported.
 * Run the tests with the command `go test`
 * These tests with run the server and client in the same process with logging
 disabled.
+
+## ROOT_PREFIX
+
+The environment variable ROOT_PREFIX can be set to specify a prefix (eg: a directory) 
+in S3 that will act as the root directory.  This prefix must already exist on S3. 
+For example, if ROOT_PREFIX is set to 'fakeroot/' this S3 key will appear as the root 
+directory to all FTP clients.  Leave this parameter blank if you wish to use the root
+directory of the S3 bucket as the root directory for the FTP session.
+
+This can offer the appearance of isolated filesystems when using multiple FTP servers 
+with a single S3 bucket.  If you are concerned about security between multiple FTP 
+sessions using different ROOT_PREFIXes you should create different IAM users and 
+roles.
 
 ## Contributing pull requests
 
@@ -106,7 +120,7 @@ the newly pushed branch on GeoNet/bucketFTP.  This will use the encrypted
 environment variables.
 
 If you don't have write access for the GeoNet/bucketFTP repo you can set up a new 
-Travis build for you forked repo on travis-ci.org. You will need to specify custom 
+Travis build for your forked repo on travis-ci.org. You will need to specify custom 
 environment variables in your Travis job for FTP_PASSWD (can be anything, it's just 
 used for testing in Travis), AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.  These must 
 belong to an AWS user that can read and write objects to the bucket specified in the 
@@ -125,5 +139,6 @@ should automatically use these packages making it easy to build.
 * Symbolic links are not supported.
 * AWS limits the number of objects returned in certain operations such as 
 ListObjectsV2.  The limit is currently hardcoded to 10000.  This will cause
-problems if you exceed this limit.
+problems if you exceed this limit, eg: a directory with many files or 
+subdirectories.
 * This project is currently experimental but coming along quickly.
