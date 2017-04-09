@@ -3,10 +3,12 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"gopkg.in/inconshreveable/log15.v2"
+	"math/rand"
 	"net"
 	"strings"
 	"time"
+
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 // Active/Passive transfer connection handler
@@ -28,7 +30,29 @@ type passiveTransferHandler struct {
 
 func (c *clientHandler) handlePASV() {
 	addr, _ := net.ResolveTCPAddr("tcp", ":0")
-	tcpListener, err := net.ListenTCP("tcp", addr)
+	var tcpListener *net.TCPListener
+	var err error
+
+	portRange := c.daddy.Settings.DataPortRange
+
+	if portRange != nil {
+		for start := portRange.Start; start < portRange.End; start++ {
+			port := portRange.Start + rand.Intn(portRange.End-portRange.Start)
+			laddr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:"+fmt.Sprintf("%d", port))
+			if err != nil {
+				continue
+			}
+
+			tcpListener, err = net.ListenTCP("tcp", laddr)
+			if err == nil {
+				break
+			}
+		}
+
+	} else {
+		tcpListener, err = net.ListenTCP("tcp", addr)
+	}
+
 	if err != nil {
 		log15.Error("Could not listen", "err", err)
 		return
@@ -36,7 +60,7 @@ func (c *clientHandler) handlePASV() {
 
 	// The listener will either be plain TCP or TLS
 	var listener net.Listener
-	if c.transferTls {
+	if c.transferTLS {
 		if tlsConfig, err := c.daddy.driver.GetTLSConfig(); err == nil {
 			listener = tls.NewListener(tcpListener, tlsConfig)
 		} else {
@@ -57,10 +81,15 @@ func (c *clientHandler) handlePASV() {
 	if c.command == "PASV" {
 		p1 := p.Port / 256
 		p2 := p.Port - (p1 * 256)
-		addr := c.conn.LocalAddr()
-		tokens := strings.Split(addr.String(), ":")
-		host := tokens[0]
-		quads := strings.Split(host, ".")
+		// Provide our external IP address so the ftp client can connect back to us
+		ip := c.daddy.Settings.PublicHost
+
+		// If we don't have an IP address, we can take the one that was used for the current connection
+		if ip == "" {
+			ip = strings.Split(c.conn.LocalAddr().String(), ":")[0]
+		}
+
+		quads := strings.Split(ip, ".")
 		c.writeMessage(227, fmt.Sprintf("Entering Passive Mode (%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2))
 	} else {
 		c.writeMessage(229, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
@@ -73,9 +102,9 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 	if p.connection == nil {
 		p.tcpListener.SetDeadline(time.Now().Add(wait))
 		var err error
-		if p.connection, err = p.listener.Accept(); err == nil {
-			return p.connection, nil
-		} else {
+		p.connection, err = p.listener.Accept()
+
+		if err != nil {
 			return nil, err
 		}
 	}

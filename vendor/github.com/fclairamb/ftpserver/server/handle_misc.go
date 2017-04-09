@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
+	"strings"
+	"time"
 )
 
 func (c *clientHandler) handleAUTH() {
@@ -19,7 +21,7 @@ func (c *clientHandler) handleAUTH() {
 
 func (c *clientHandler) handlePROT() {
 	// P for Private, C for Clear
-	c.transferTls = (c.param == "P")
+	c.transferTLS = (c.param == "P")
 	c.writeMessage(200, "OK")
 }
 
@@ -31,25 +33,86 @@ func (c *clientHandler) handleSYST() {
 	c.writeMessage(215, "UNIX Type: L8")
 }
 
+func (c *clientHandler) handleSTAT() {
+	// STAT is a bit tricky
+
+	if c.param == "" { // Without a file, it's the server stat
+		c.handleSTATServer()
+	} else { // With a file/dir it's the file or the dir's files stat
+		c.handleSTATFile()
+	}
+}
+
+func (c *clientHandler) handleSITE() {
+	spl := strings.SplitN(c.param, " ", 2)
+	if len(spl) > 1 {
+		if strings.ToUpper(spl[0]) == "CHMOD" {
+			c.handleCHMOD(spl[1])
+		}
+	}
+}
+
+func (c *clientHandler) handleSTATServer() {
+	c.writeLine("213- FTP server status:")
+	duration := time.Now().UTC().Sub(c.connectedAt)
+	duration -= duration % time.Second
+	c.writeLine(fmt.Sprintf(
+		"Connected to %s:%d from %s for %s",
+		c.daddy.Settings.ListenHost, c.daddy.Settings.ListenPort,
+		c.conn.RemoteAddr(),
+		duration,
+	))
+	if c.user != "" {
+		c.writeLine(fmt.Sprintf("Logged in as %s", c.user))
+	} else {
+		c.writeLine("Not logged in yet")
+	}
+	c.writeLine("ftpserver - golang FTP server")
+	defer c.writeMessage(213, "End")
+}
+
+func (c *clientHandler) handleOPTS() {
+	args := strings.SplitN(c.param, " ", 2)
+	if args[0] == "UTF8" {
+		c.writeMessage(200, "I'm in UTF8 only anyway")
+	} else {
+		c.writeMessage(500, "Don't know this option")
+	}
+}
+
 func (c *clientHandler) handleNOOP() {
 	c.writeMessage(200, "OK")
 }
 
 func (c *clientHandler) handleFEAT() {
-	c.writer.WriteString("211- These are my features\r\n")
+	c.writeLine("211- These are my features")
+	defer c.writeMessage(211, "end")
 
-	c.writer.WriteString(" UTF8\r\n")
-	c.writer.WriteString(" SIZE\r\n")
+	features := []string{
+		"UTF8",
+		"SIZE",
+		"MDTM",
+		"REST STREAM",
+	}
 
-	c.writeMessage(211, "end")
+	for _, f := range features {
+		c.writeLine(" " + f)
+	}
 }
 
 func (c *clientHandler) handleTYPE() {
-	c.writeMessage(200, "Type set to binary")
+	switch c.param {
+	case "I":
+		c.writeMessage(200, "Type set to binary")
+	case "A":
+		c.writeMessage(200, "WARNING: ASCII isn't correctly supported")
+	default:
+		c.writeMessage(500, "Not understood")
+	}
 }
 
 func (c *clientHandler) handleQUIT() {
-	//fmt.Println("Goodbye")
 	c.writeMessage(221, "Goodbye")
 	c.disconnect()
+	c.reader = nil
 }
