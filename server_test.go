@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -163,7 +164,7 @@ func TestDirs(t *testing.T) {
 	}{
 		{"testdir1" + U, "/testdir1" + U, false},
 		{"/testdir2" + U, "/testdir2" + U, false},
-		{"/testdir3" + U + "/", "/testdir3" + U + "/", false},
+		{"/testdir3" + U + "/", "/testdir3" + U, false},
 		{"test dir 4" + U, "/test dir 4" + U, false},
 		// failures, the ftp server package has a problem recovering after an error:
 		//{"/", "/", true},                               // shouldn't be able to mkdir /
@@ -182,9 +183,14 @@ func TestDirs(t *testing.T) {
 	if err = c.MakeDir(tPrefix); err != nil {
 		t.Fatal(err)
 	}
+
 	if len(tPrefix) > 0 {
 		defer c.Delete(tPrefix)
 	}
+
+	defer func() {
+		driver.rootPrefix = ROOT_PREFIX
+	}()
 
 	for _, tc := range testCases {
 		for _, prefix := range []string{"", tPrefix} {
@@ -202,22 +208,22 @@ func TestDirs(t *testing.T) {
 				}
 
 				if err = c.ChangeDir(tc.path); err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
 
 				var cwd string
 				if cwd, err = c.CurrentDir(); err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
 
 				if cwd != tc.expectedCwd {
-					t.Errorf("cwd [%s] differs from expected path [%s]", cwd, tc.expectedCwd)
+					t.Fatalf("cwd [%s] differs from expected path [%s]", cwd, tc.expectedCwd)
 				}
 
 				// test getting and putting a file from this directory
 				testFile := "testfile" + U
 				if err = checkUploadedFile(c, testFile); err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
 				defer c.Delete(testFile)
 
@@ -227,26 +233,22 @@ func TestDirs(t *testing.T) {
 				}
 
 				if err = c.ChangeDir("/"); err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
 
 				if err = c.Delete(tc.path); err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
 
 				// directory doesn't exist any more, err should be non nil
 				if err = c.ChangeDir(tc.path); err == nil {
-					t.Error("expected ChangeDir to fail but it worked")
+					t.Fatal("expected ChangeDir to fail but it worked")
 				}
 
 				driver.rootPrefix = ROOT_PREFIX
-
 			})
 		}
-
 	}
-
-	driver.rootPrefix = ROOT_PREFIX
 }
 
 func TestRename(t *testing.T) {
@@ -517,8 +519,9 @@ func TestListFiles(t *testing.T) {
 
 	// Arg, this ftp client doesn't list directories.  At least we know the listing isn't recursive.
 	for i, e := range entries {
-		if e.Name != files[i] {
-			t.Errorf("Expected file name '%s' but observed '%s'", e.Name, files[i])
+		name := strings.TrimSpace(e.Name)
+		if name != files[i] {
+			t.Errorf("Expected file name '%s' but observed '%s'", name, files[i])
 		}
 	}
 

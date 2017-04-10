@@ -1,4 +1,6 @@
 // Package ftp implements a FTP client as described in RFC 959.
+//
+// A textproto.Error is returned for errors at the protocol level.
 package ftp
 
 import (
@@ -23,11 +25,16 @@ const (
 )
 
 // ServerConn represents the connection to a remote FTP server.
+// It should be protected from concurrent accesses.
 type ServerConn struct {
-	conn     *textproto.Conn
-	host     string
-	timeout  time.Duration
-	features map[string]string
+	// Do not use EPSV mode
+	DisableEPSV bool
+
+	conn          *textproto.Conn
+	host          string
+	timeout       time.Duration
+	features      map[string]string
+	mlstSupported bool
 }
 
 // Entry describes a file and is returned by List().
@@ -93,6 +100,10 @@ func DialTimeout(addr string, timeout time.Duration) (*ServerConn, error) {
 		return nil, err
 	}
 
+	if _, mlstSupported := c.features["MLST"]; mlstSupported {
+		c.mlstSupported = true
+	}
+
 	return c, nil
 }
 
@@ -118,8 +129,12 @@ func (c *ServerConn) Login(user, password string) error {
 	}
 
 	// Switch to binary mode
-	_, _, err = c.cmd(StatusCommandOK, "TYPE I")
-	if err != nil {
+	if _, _, err = c.cmd(StatusCommandOK, "TYPE I"); err != nil {
+		return err
+	}
+
+	// Switch to UTF-8
+	if err := c.setUTF8(); err != nil {
 		return err
 	}
 
@@ -158,6 +173,31 @@ func (c *ServerConn) feat() error {
 		}
 
 		c.features[command] = commandDesc
+	}
+
+	return nil
+}
+
+// setUTF8 issues an "OPTS UTF8 ON" command.
+func (c *ServerConn) setUTF8() error {
+	if _, ok := c.features["UTF8"]; !ok {
+		return nil
+	}
+
+	code, message, err := c.cmd(-1, "OPTS UTF8 ON")
+	if err != nil {
+		return err
+	}
+
+	// The ftpd "filezilla-server" has FEAT support for UTF8, but always returns
+	// "202 UTF8 mode is always enabled. No need to send this command." when
+	// trying to use it. That's OK
+	if code == StatusCommandNotImplemented {
+		return nil
+	}
+
+	if code != StatusCommandOK {
+		return errors.New(message)
 	}
 
 	return nil
@@ -219,17 +259,26 @@ func (c *ServerConn) pasv() (port int, err error) {
 	return
 }
 
+// getDataConnPort returns a port for a new data connection
+// it uses the best available method to do so
+func (c *ServerConn) getDataConnPort() (int, error) {
+	if !c.DisableEPSV {
+		if port, err := c.epsv(); err == nil {
+			return port, nil
+		}
+
+		// if there is an error, disable EPSV for the next attempts
+		c.DisableEPSV = true
+	}
+
+	return c.pasv()
+}
+
 // openDataConn creates a new FTP data connection.
 func (c *ServerConn) openDataConn() (net.Conn, error) {
-	var (
-		port int
-		err  error
-	)
-
-	if port, err = c.epsv(); err != nil {
-		if port, err = c.pasv(); err != nil {
-			return nil, err
-		}
+	port, err := c.getDataConnPort()
+	if err != nil {
+		return nil, err
 	}
 
 	return net.DialTimeout("tcp", net.JoinHostPort(c.host, strconv.Itoa(port)), c.timeout)
@@ -257,6 +306,7 @@ func (c *ServerConn) cmdDataConnFrom(offset uint64, format string, args ...inter
 	if offset != 0 {
 		_, _, err := c.cmd(StatusRequestFilePending, "REST %d", offset)
 		if err != nil {
+			conn.Close()
 			return nil, err
 		}
 	}
@@ -278,201 +328,6 @@ func (c *ServerConn) cmdDataConnFrom(offset uint64, format string, args ...inter
 	}
 
 	return conn, nil
-}
-
-var errUnsupportedListLine = errors.New("Unsupported LIST line")
-
-// parseRFC3659ListLine parses the style of directory line defined in RFC 3659.
-func parseRFC3659ListLine(line string) (*Entry, error) {
-	iSemicolon := strings.Index(line, ";")
-	iWhitespace := strings.Index(line, " ")
-
-	if iSemicolon < 0 || iSemicolon > iWhitespace {
-		return nil, errUnsupportedListLine
-	}
-
-	e := &Entry{
-		Name: line[iWhitespace+1:],
-	}
-
-	for _, field := range strings.Split(line[:iWhitespace-1], ";") {
-		i := strings.Index(field, "=")
-		if i < 1 {
-			return nil, errUnsupportedListLine
-		}
-
-		key := field[:i]
-		value := field[i+1:]
-
-		switch key {
-		case "modify":
-			var err error
-			e.Time, err = time.Parse("20060102150405", value)
-			if err != nil {
-				return nil, err
-			}
-		case "type":
-			switch value {
-			case "dir", "cdir", "pdir":
-				e.Type = EntryTypeFolder
-			case "file":
-				e.Type = EntryTypeFile
-			}
-		case "size":
-			e.setSize(value)
-		}
-	}
-	return e, nil
-}
-
-// parseLsListLine parses a directory line in a format based on the output of
-// the UNIX ls command.
-func parseLsListLine(line string) (*Entry, error) {
-	fields := strings.Fields(line)
-	if len(fields) >= 7 && fields[1] == "folder" && fields[2] == "0" {
-		e := &Entry{
-			Type: EntryTypeFolder,
-			Name: strings.Join(fields[6:], " "),
-		}
-		if err := e.setTime(fields[3:6]); err != nil {
-			return nil, err
-		}
-
-		return e, nil
-	}
-
-	if len(fields) < 8 {
-		return nil, errUnsupportedListLine
-	}
-
-	if fields[1] == "0" {
-		e := &Entry{
-			Type: EntryTypeFile,
-			Name: strings.Join(fields[7:], " "),
-		}
-
-		if err := e.setSize(fields[2]); err != nil {
-			return nil, err
-		}
-		if err := e.setTime(fields[4:7]); err != nil {
-			return nil, err
-		}
-
-		return e, nil
-	}
-
-	if len(fields) < 9 {
-		return nil, errUnsupportedListLine
-	}
-
-	e := &Entry{}
-	switch fields[0][0] {
-	case '-':
-		e.Type = EntryTypeFile
-		if err := e.setSize(fields[4]); err != nil {
-			return nil, err
-		}
-	case 'd':
-		e.Type = EntryTypeFolder
-	case 'l':
-		e.Type = EntryTypeLink
-	default:
-		return nil, errors.New("Unknown entry type")
-	}
-
-	if err := e.setTime(fields[5:8]); err != nil {
-		return nil, err
-	}
-
-	e.Name = strings.Join(fields[8:], " ")
-	return e, nil
-}
-
-var dirTimeFormats = []string{
-	"01-02-06  03:04PM",
-	"2006-01-02  15:04",
-}
-
-// parseDirListLine parses a directory line in a format based on the output of
-// the MS-DOS DIR command.
-func parseDirListLine(line string) (*Entry, error) {
-	e := &Entry{}
-	var err error
-
-	// Try various time formats that DIR might use, and stop when one works.
-	for _, format := range dirTimeFormats {
-		if len(line) > len(format) {
-			e.Time, err = time.Parse(format, line[:len(format)])
-			if err == nil {
-				line = line[len(format):]
-				break
-			}
-		}
-	}
-	if err != nil {
-		// None of the time formats worked.
-		return nil, errUnsupportedListLine
-	}
-
-	line = strings.TrimLeft(line, " ")
-	if strings.HasPrefix(line, "<DIR>") {
-		e.Type = EntryTypeFolder
-		line = strings.TrimPrefix(line, "<DIR>")
-	} else {
-		space := strings.Index(line, " ")
-		if space == -1 {
-			return nil, errUnsupportedListLine
-		}
-		e.Size, err = strconv.ParseUint(line[:space], 10, 64)
-		if err != nil {
-			return nil, errUnsupportedListLine
-		}
-		e.Type = EntryTypeFile
-		line = line[space:]
-	}
-
-	e.Name = strings.TrimLeft(line, " ")
-	return e, nil
-}
-
-var listLineParsers = []func(line string) (*Entry, error){
-	parseRFC3659ListLine,
-	parseLsListLine,
-	parseDirListLine,
-}
-
-// parseListLine parses the various non-standard format returned by the LIST
-// FTP command.
-func parseListLine(line string) (*Entry, error) {
-	for _, f := range listLineParsers {
-		e, err := f(line)
-		if err == errUnsupportedListLine {
-			// Try another format.
-			continue
-		}
-		return e, err
-	}
-	return nil, errUnsupportedListLine
-}
-
-func (e *Entry) setSize(str string) (err error) {
-	e.Size, err = strconv.ParseUint(str, 0, 64)
-	return
-}
-
-func (e *Entry) setTime(fields []string) (err error) {
-	var timeStr string
-	if strings.Contains(fields[2], ":") { // this year
-		thisYear, _, _ := time.Now().Date()
-		timeStr = fields[1] + " " + fields[0] + " " + strconv.Itoa(thisYear)[2:4] + " " + fields[2] + " GMT"
-	} else { // not this year
-		if len(fields[2]) != 4 {
-			return errors.New("Invalid year format in time string")
-		}
-		timeStr = fields[1] + " " + fields[0] + " " + fields[2][2:4] + " 00:00 GMT"
-	}
-	e.Time, err = time.Parse("_2 Jan 06 15:04 MST", timeStr)
-	return
 }
 
 // NameList issues an NLST FTP command.
@@ -497,7 +352,18 @@ func (c *ServerConn) NameList(path string) (entries []string, err error) {
 
 // List issues a LIST FTP command.
 func (c *ServerConn) List(path string) (entries []*Entry, err error) {
-	conn, err := c.cmdDataConnFrom(0, "LIST %s", path)
+	var cmd string
+	var parseFunc func(string) (*Entry, error)
+
+	if c.mlstSupported {
+		cmd = "MLSD"
+		parseFunc = parseRFC3659ListLine
+	} else {
+		cmd = "LIST"
+		parseFunc = parseListLine
+	}
+
+	conn, err := c.cmdDataConnFrom(0, "%s %s", cmd, path)
 	if err != nil {
 		return
 	}
@@ -507,8 +373,7 @@ func (c *ServerConn) List(path string) (entries []*Entry, err error) {
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		line := scanner.Text()
-		entry, err := parseListLine(line)
+		entry, err := parseFunc(scanner.Text())
 		if err == nil {
 			entries = append(entries, entry)
 		}
@@ -550,6 +415,16 @@ func (c *ServerConn) CurrentDir() (string, error) {
 	}
 
 	return msg[start+1 : end], nil
+}
+
+// FileSize issues a SIZE FTP command, which Returns the size of the file
+func (c *ServerConn) FileSize(path string) (int64, error) {
+	_, msg, err := c.cmd(StatusFile, "SIZE %s", path)
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.ParseInt(msg, 10, 64)
 }
 
 // Retr issues a RETR FTP command to fetch the specified file from the remote

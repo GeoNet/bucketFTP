@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"gopkg.in/inconshreveable/log15.v2"
 	"io"
 	"net"
 	"strings"
 	"time"
+
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 type clientHandler struct {
-	Id          uint32               // Id of the client
+	ID          uint32               // ID of the client
 	daddy       *FtpServer           // Server on which the connection was accepted
 	driver      ClientHandlingDriver // Client handling driver
 	conn        net.Conn             // TCP connection
@@ -23,21 +24,22 @@ type clientHandler struct {
 	command     string               // Command received on the connection
 	param       string               // Param of the FTP command
 	connectedAt time.Time            // Date of connection
-	ctx_rnfr    string               // Rename from
-	ctx_rest    int64                // Restart point
+	ctxRnfr     string               // Rename from
+	ctxRest     int64                // Restart point
 	debug       bool                 // Show debugging info on the server side
 	transfer    transferHandler      // Transfer connection (only passive is implemented at this stage)
-	transferTls bool                 // Use TLS for transfer connection
+	transferTLS bool                 // Use TLS for transfer connection
 }
 
-func (server *FtpServer) NewClientHandler(connection net.Conn) *clientHandler {
+// newClientHandler initializes a client handler when someone connects
+func (server *FtpServer) newClientHandler(connection net.Conn) *clientHandler {
 
-	server.clientCounter += 1
+	server.clientCounter++
 
 	p := &clientHandler{
 		daddy:       server,
 		conn:        connection,
-		Id:          server.clientCounter,
+		ID:          server.clientCounter,
 		writer:      bufio.NewWriter(connection),
 		reader:      bufio.NewReader(connection),
 		connectedAt: time.Now().UTC(),
@@ -53,18 +55,22 @@ func (c *clientHandler) disconnect() {
 	c.conn.Close()
 }
 
+// Path provides the current working directory of the client
 func (c *clientHandler) Path() string {
 	return c.path
 }
 
+// SetPath changes the current working directory
 func (c *clientHandler) SetPath(path string) {
 	c.path = path
 }
 
+// Debug defines if we will list all interaction
 func (c *clientHandler) Debug() bool {
 	return c.debug
 }
 
+// SetDebug changes the debug flag
 func (c *clientHandler) SetDebug(debug bool) {
 	c.debug = debug
 }
@@ -75,6 +81,7 @@ func (c *clientHandler) end() {
 	}
 }
 
+// HandleCommands reads the stream of commands
 func (c *clientHandler) HandleCommands() {
 	defer c.daddy.clientDeparture(c)
 	defer c.end()
@@ -86,7 +93,7 @@ func (c *clientHandler) HandleCommands() {
 
 	defer c.daddy.driver.UserLeft(c)
 
-	//fmt.Println(p.id, " Got client on: ", p.ip)
+	//fmt.Println(c.id, " Got client on: ", c.ip)
 	if msg, err := c.daddy.driver.WelcomeUser(c); err == nil {
 		c.writeMessage(220, msg)
 	} else {
@@ -95,51 +102,84 @@ func (c *clientHandler) HandleCommands() {
 	}
 
 	for {
-		line, err := c.reader.ReadString('\n')
-
-		if c.debug {
-			log15.Info("FTP RECV", "action", "ftp.cmd_recv", "line", line)
-		}
-
-		if err != nil {
-			if err == io.EOF {
-				log15.Info("Client disconnected", "id", c.Id)
-			} else {
-				log15.Error("TCP error", "err", err)
+		if c.reader == nil {
+			if c.debug {
+				log15.Debug("Clean disconnect", "action", "ftp.disconnect", "id", c.ID, "clean", true)
 			}
 			return
 		}
 
-		command, param := parseLine(line)
-		c.command = strings.ToUpper(command)
-		c.param = param
+		line, err := c.reader.ReadString('\n')
 
-		fn := commandsMap[c.command]
-		if fn == nil {
-			c.writeMessage(550, "Not handled")
-		} else {
-			fn(c)
+		if err != nil {
+			if err == io.EOF {
+				if c.debug {
+					log15.Debug("TCP disconnect", "action", "ftp.disconnect", "id", c.ID, "clean", false)
+				}
+			} else {
+				log15.Error("Read error", "action", "ftp.read_error", "id", c.ID, "err", err)
+			}
+			return
 		}
+
+		if c.debug {
+			log15.Debug("FTP RECV", "action", "ftp.cmd_recv", "id", c.ID, "line", line)
+		}
+
+		c.handleCommand(line)
 	}
 }
 
-func (c *clientHandler) writeMessage(code int, message string) {
-	line := fmt.Sprintf("%d %s\r\n", code, message)
-	if c.debug {
-		log15.Info("FTP SEND", "action", "ftp.cmd_send", "line", line)
+// handleCommand takes care of executing the received line
+func (c *clientHandler) handleCommand(line string) {
+	command, param := parseLine(line)
+	c.command = strings.ToUpper(command)
+	c.param = param
+
+	cmdDesc := commandsMap[c.command]
+	if cmdDesc == nil {
+		c.writeMessage(500, "Unknown command")
+		return
 	}
-	c.writer.WriteString(line)
+
+	if c.driver == nil && !cmdDesc.Open {
+		c.writeMessage(530, "Please login with USER and PASS")
+		return
+	}
+
+	// Let's prepare to recover in case there's a command error
+	defer func() {
+		if r := recover(); r != nil {
+			c.writeMessage(500, fmt.Sprintf("Internal error: %s", r))
+		}
+	}()
+	cmdDesc.Fn(c)
+}
+
+func (c *clientHandler) writeLine(line string) {
+	if c.debug {
+		log15.Debug("FTP SEND", "action", "ftp.cmd_send", "id", c.ID, "line", line)
+	}
+	c.writer.Write([]byte(line))
+	c.writer.Write([]byte("\r\n"))
 	c.writer.Flush()
 }
 
+func (c *clientHandler) writeMessage(code int, message string) {
+	c.writeLine(fmt.Sprintf("%d %s", code, message))
+}
+
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
-	if c.transfer != nil {
-		c.writeMessage(150, "Using transfer connection")
-		return c.transfer.Open()
-	} else {
+	if c.transfer == nil {
 		c.writeMessage(550, "No passive connection declared")
 		return nil, errors.New("No passive connection declared")
 	}
+	c.writeMessage(150, "Using transfer connection")
+	conn, err := c.transfer.Open()
+	if err == nil && c.debug {
+		log15.Debug("FTP Transfer connection opened", "action", "ftp.transfer_open", "id", c.ID, "remoteAddr", conn.RemoteAddr().String(), "localAddr", conn.LocalAddr().String())
+	}
+	return conn, err
 }
 
 func (c *clientHandler) TransferClose() {
@@ -147,6 +187,9 @@ func (c *clientHandler) TransferClose() {
 		c.writeMessage(226, "Closing transfer connection")
 		c.transfer.Close()
 		c.transfer = nil
+		if c.debug {
+			log15.Debug("FTP Transfer connection closed", "action", "ftp.transfer_close", "id", c.ID)
+		}
 	}
 }
 
