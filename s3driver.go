@@ -24,7 +24,6 @@ type S3Driver struct {
 	ftpPort      int
 	ftpUser      string
 	ftpPasswd    string
-	maxKeys      int64
 }
 
 func (d *S3Driver) WelcomeUser(cc server.ClientContext) (string, error) {
@@ -167,7 +166,6 @@ func (d *S3Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 		Bucket:    &S3_BUCKET_NAME,
 		Prefix:    &prefix,
 		Delimiter: &delimiter,
-		MaxKeys:   &d.maxKeys,
 	}
 
 	files := []os.FileInfo{}
@@ -336,20 +334,28 @@ func (d *S3Driver) DeleteFile(cc server.ClientContext, path string) error {
 	}
 
 	listParams := &s3.ListObjectsV2Input{
-		Bucket:  &S3_BUCKET_NAME,
-		Prefix:  &relPath,
-		MaxKeys: &d.maxKeys,
+		Bucket: &S3_BUCKET_NAME,
+		Prefix: &relPath,
 		//Delimiter: &delimiter, // empty delim makes this recursive
 	}
 
-	var resp *s3.ListObjectsV2Output
-	if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
-		return stripNewlines(err)
-	}
-
 	var delObjects []*s3.ObjectIdentifier
-	for _, f := range resp.Contents {
-		delObjects = append(delObjects, &s3.ObjectIdentifier{Key: f.Key})
+	for {
+		var resp *s3.ListObjectsV2Output
+		if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
+			return stripNewlines(err)
+		}
+
+		for _, f := range resp.Contents {
+			delObjects = append(delObjects, &s3.ObjectIdentifier{Key: f.Key})
+		}
+
+		// AWS using pointers to bools (?!) so need to check for nil
+		if resp.IsTruncated == nil || !*resp.IsTruncated {
+			break
+		}
+
+		listParams.ContinuationToken = resp.NextContinuationToken
 	}
 
 	if len(delObjects) == 0 {
@@ -442,19 +448,31 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	}
 
 	listParams := &s3.ListObjectsV2Input{
-		Bucket:  &S3_BUCKET_NAME,
-		Prefix:  &relFrom,
-		MaxKeys: &d.maxKeys,
-	}
-
-	var resp *s3.ListObjectsV2Output
-	if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
-		return stripNewlines(err)
+		Bucket: &S3_BUCKET_NAME,
+		Prefix: &relFrom,
 	}
 
 	var srcObjects []*s3.ObjectIdentifier
-	for _, f := range resp.Contents {
-		srcObjects = append(srcObjects, &s3.ObjectIdentifier{Key: f.Key})
+	for {
+		var resp *s3.ListObjectsV2Output
+		if resp, err = d.s3Client.ListObjectsV2(listParams); err != nil {
+			return stripNewlines(err)
+		}
+
+		for _, f := range resp.Contents {
+			srcObjects = append(srcObjects, &s3.ObjectIdentifier{Key: f.Key})
+		}
+
+		// AWS using pointers to bools (?!) so need to check for nil
+		if resp.IsTruncated == nil || !*resp.IsTruncated {
+			break
+		}
+
+		listParams.ContinuationToken = resp.NextContinuationToken
+	}
+
+	if len(srcObjects) == 0 {
+		return fmt.Errorf("Zero files matching pattern:%s", from)
 	}
 
 	// copy all destinations objects from source to dest (already ordered from top level directory key)
@@ -477,10 +495,6 @@ func (d *S3Driver) RenameFile(cc server.ClientContext, from, to string) error {
 	delParams := &s3.DeleteObjectsInput{
 		Bucket: &S3_BUCKET_NAME,
 		Delete: &s3.Delete{Objects: srcObjects},
-	}
-
-	if len(srcObjects) == 0 {
-		return fmt.Errorf("Unable to remove old file: %s [S3 key: %s]", from, relFrom)
 	}
 
 	if _, err = d.s3Client.DeleteObjects(delParams); err != nil {
@@ -579,7 +593,6 @@ func NewS3Driver(s3Session *session.Session, s3BucketName, rootPrefix string, ft
 	}
 
 	driver := &S3Driver{
-		maxKeys:      10000,
 		s3Client:     client,
 		s3Session:    s3Session,
 		s3BucketName: s3BucketName,
