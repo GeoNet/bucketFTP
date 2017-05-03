@@ -137,8 +137,4 @@ implemented: get, put, delete, ls, cd, rename, mkdir.
 should automatically use these packages making it easy to build.
 * Globbing of files (eg: *.jpg) is not supported.
 * Symbolic links are not supported.
-* AWS limits the number of objects returned in certain operations such as 
-ListObjectsV2.  The limit is currently hardcoded to 10000.  This will cause
-problems if you exceed this limit, eg: a directory with many files or 
-subdirectories.
 * This project is currently experimental but coming along quickly.

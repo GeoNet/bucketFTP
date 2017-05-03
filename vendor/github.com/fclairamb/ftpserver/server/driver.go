@@ -8,9 +8,9 @@ import (
 
 // This file is the driver part of the server. It must be implemented by anyone wanting to use the server.
 
-// ServerDriver handles the authentication and ClientHandlingDriver selection
-type ServerDriver interface {
-	// Load some general settings around the server setup
+// MainDriver handles the authentication and ClientHandlingDriver selection
+type MainDriver interface {
+	// GetSettings returns some general settings around the server setup
 	GetSettings() *Settings
 
 	// WelcomeUser is called to send the very first welcome message
@@ -22,7 +22,7 @@ type ServerDriver interface {
 	// AuthUser authenticates the user and selects an handling driver
 	AuthUser(cc ClientContext, user, pass string) (ClientHandlingDriver, error)
 
-	// GetCertificate returns a TLS Certificate to use
+	// GetTLSConfig returns a TLS Certificate to use
 	// The certificate could frequently change if we use something like "let's encrypt"
 	GetTLSConfig() (*tls.Config, error)
 }
@@ -52,11 +52,14 @@ type ClientHandlingDriver interface {
 
 	// CanAllocate gives the approval to allocate some data
 	CanAllocate(cc ClientContext, size int) (bool, error)
+
+	// ChmodFile changes the attributes of the file
+	ChmodFile(cc ClientContext, path string, mode os.FileMode) error
 }
 
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
-	// Get current path
+	// Path provides the path of the current connection
 	Path() string
 
 	// SetDebug activates the debugging of this connection commands
@@ -74,9 +77,17 @@ type FileStream interface {
 	io.Seeker
 }
 
+// PortRange is a range of ports
+type PortRange struct {
+	Start int // Range start
+	End   int // Range end
+}
+
 // Settings define all the server settings
 type Settings struct {
-	Host           string // Host to receive connections on
-	Port           int    // Port to listen on
-	MaxConnections int    // Max number of connections to accept
+	ListenHost     string     // Host to receive connections on
+	ListenPort     int        // Port to listen on
+	PublicHost     string     // Public IP to expose (only an IP address is accepted at this stage)
+	MaxConnections int        // Max number of connections to accept
+	DataPortRange  *PortRange // Port Range for data connections. Random one will be used if not specified
 }
