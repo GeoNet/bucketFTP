@@ -30,3 +30,12 @@ env:
         - AWS_REGION=ap-southeast-2
         - S3_BUCKET_NAME=bucketftp-test.geonet.org.nz
         - FTP_USER=ftpuser
+
+notifications:
+  email: false
+    slack:
+    if: branch in (main, staging, production)
+    on_success: never
+    on_failure: always
+    on_pull_requests: false
+    secure: Daxne6otrNSVCxtL8KPs7HqdJvtuammNQ1wBb790cSy6gq48Gu+fKNA/okApxDsP7d5X7z8iAFincH94lBpO/cGQSsai0ZN79Uwt3Rde30Egqa4QmXXzGIdxepCBFcO6icXmmcnTxjpFhQNawxjVKApUlhlVSJHxyJBBj0/xbbDbFP2uiltgvqMrk2j69uwnZsx89X392KkzMWyRrgm0brTaRIyZ/UR/uTAeZid3QVQiR7UzatQnsx1O6EvwDBDPgXK0eUEaOkhBPJDAS34oCPwuEISOc7CBNJ2hl9m/9rVCd/UY0ZJfuJfdi4gKBUpbwJ/F/yh20g/KBS6vz4lmfLdAD5ig5vtHBt1JhPH//AESuaAlciGkANW1A0jfNyM/+eTOgzjq1SdfBzGrmNt50eBhLWKGJdjcWdReDxNVje+LW/D5PtiAvwTB9iRcijh47vhAqNDAfHv7FK7qjwdyPnbp5PS8D9ccB0YHhtAOmf406VzZqx4V+PcUNkeYj1mMNP55JgrPr7MORSza4k3KGsed5WeEIiC3EtV39H6sbAhJ9Gix0roavIWIFTunIl253042EzkZJ6VOQWtRvuCI9d3TNvr3XQShVjn4/gV+C4Wq26EyvMgatpspxpiC+Tx0ECChqhM1sD1WLKx3LQzRLZarNG4beT9k68QP1ENE890=
